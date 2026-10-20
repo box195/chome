@@ -25,6 +25,8 @@ Android Chrome에서 **휴대폰 알림 켜기 → 허용 → 시험 알림 보�
 
 푸시 VAPID 개인 키는 PC에서 생성하고 `CHome-WebPush-v1` 엔트로피의 Windows DPAPI CurrentUser로 보호한 `push-vapid.dat`에 저장합니다. 공개 키만 `push-config.json`에 게시합니다. 기존 Firebase 갱신 토큰도 현재 Windows 사용자의 암호화 파일에서 읽으며 관리자 키는 사용하지 않습니다. 개인 키를 바꾸면 휴대폰에서 다시 등록해야 합니다. 발송기는 구독·시험 요청·결과를 소유자 전용 `push/` 경로에 기록하며 오래된 시험 요청과 재시작 전 움직임을 재발송하지 않습니다.
 
+새 PC 설치 시 `scripts/build-push.ps1`로 보조 프로그램을 빌드하고 의존성을 설치한 후 `node windows/push-sender/provision.mjs`를 최초 한 번 실행합니다. 기존 개인 키가 있으면 덮어쓰지 않고 실패합니다. 생성된 공개 설정을 웹에 배포하고 발송기 폴더를 설치하세요. 이미 설정된 현재 PC에서는 키를 다시 생성하지 않습니다.
+
 웹: Node.js 설치 후 `npm install`, `npm run build`. GitHub Pages는 main 브랜치 루트를 게시합니다.
 
 Windows: .NET Framework C# 컴파일러와 정식 FFmpeg 실행파일이 필요합니다. `scripts/build-windows.ps1 -Ffmpeg <ffmpeg.exe 경로>`로 `dist/`에 빌드합니다. 기존 실행파일과 설정을 백업한 뒤 설치하세요. 수신기와 같은 폴더에 기존 예비 직접 제어용 `index.html`, `app.js`, CHome용 `chome.html`, `chome.bundle.js`를 놓습니다. `chome.html`은 배포된 `index.html`에서 스크립트 주소를 `./chome.js`로 바꾼 사본입니다. 수신기의 `/chome.js`는 번들 파일을 제공합니다.
