@@ -1,4 +1,4 @@
-﻿import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getDatabase,ref,onValue,set} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
 const app=initializeApp({apiKey:"AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo",authDomain:"chome-a8970.firebaseapp.com",databaseURL:"https://chome-a8970-default-rtdb.firebaseio.com",projectId:"chome-a8970",storageBucket:"chome-a8970.firebasestorage.app",messagingSenderId:"280390101020",appId:"1:280390101020:web:9b34e433a1ab2f4a0797d9"});
@@ -72,7 +72,7 @@ $("link").onclick=async()=>{
  if(code.length!==10){setText("linkFeedback","10자리 코드를 입력하세요.");return}
  $("link").disabled=true;
  try{
-  let r=await fetch("https://box1.tail23cca9.ts.net:8443/api/cloud/link",{
+  let r=await fetch("http://127.0.0.1:18742/api/cloud/link",{
    method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({code,uid:user.uid,refreshToken:user.refreshToken}),cache:"no-store"
   });
@@ -80,6 +80,6 @@ $("link").onclick=async()=>{
   if(!r.ok)throw Error(response.error||("HTTP "+r.status));
   $("code").value="";
   setText("linkFeedback","PC 연결 성공! 앞으로 녹화 명령은 Firebase로 전달됩니다.");
- }catch(e){setText("linkFeedback","PC 연결 실패: "+e.message+" · 최초 연결은 Tailscale이 필요합니다.")}
+ }catch(e){setText("linkFeedback","PC 연결 실패: "+e.message+" · 최초 연결은 카메라가 연결된 PC 브라우저에서 진행하세요.")}
  finally{$("link").disabled=false}
 };
