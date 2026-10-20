@@ -1,0 +1,107 @@
+﻿{
+    "rules":  {
+                  ".read":  false,
+                  ".write":  false,
+                  "clients":  {
+                                  "$uid":  {
+                                               ".read":  "auth != null \u0026\u0026 auth.uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 $uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027google.com\u0027",
+                                               "command":  {
+                                                               ".write":  "auth != null \u0026\u0026 auth.uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 $uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027google.com\u0027",
+                                                               ".validate":  "newData.hasChildren([\u0027id\u0027,\u0027seq\u0027,\u0027action\u0027,\u0027requester\u0027,\u0027issuedAt\u0027]) \u0026\u0026 newData.child(\u0027id\u0027).isString() \u0026\u0026 newData.child(\u0027id\u0027).val().matches(/^[a-f0-9]{32}$/) \u0026\u0026 newData.child(\u0027seq\u0027).isNumber() \u0026\u0026 newData.child(\u0027seq\u0027).val() \u003e 0 \u0026\u0026 (!data.exists() || newData.child(\u0027seq\u0027).val() \u003e data.child(\u0027seq\u0027).val()) \u0026\u0026 newData.child(\u0027action\u0027).isString() \u0026\u0026 (newData.child(\u0027action\u0027).val() === \u0027START\u0027 || newData.child(\u0027action\u0027).val() === \u0027STOP\u0027) \u0026\u0026 newData.child(\u0027requester\u0027).val() === auth.uid \u0026\u0026 newData.child(\u0027issuedAt\u0027).isNumber() \u0026\u0026 newData.child(\u0027issuedAt\u0027).val() \u003e= now - 90000 \u0026\u0026 newData.child(\u0027issuedAt\u0027).val() \u003c= now + 15000 \u0026\u0026 newData.child(\u0027seq\u0027).val() \u003e= now - 90000 \u0026\u0026 newData.child(\u0027seq\u0027).val() \u003c= now + 15000",
+                                                               "$other":  {
+                                                                              ".validate":  false
+                                                                          },
+                                                               "requester":  {
+                                                                                 ".validate":  "newData.isString() \u0026\u0026 newData.val() === auth.uid"
+                                                                             },
+                                                               "issuedAt":  {
+                                                                                ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e= now - 90000 \u0026\u0026 newData.val() \u003c= now + 15000"
+                                                                            },
+                                                               "id":  {
+                                                                          ".validate":  "newData.isString() \u0026\u0026 newData.val().matches(/^[a-f0-9]{32}$/)"
+                                                                      },
+                                                               "action":  {
+                                                                              ".validate":  "newData.isString() \u0026\u0026 (newData.val() === \u0027START\u0027 || newData.val() === \u0027STOP\u0027)"
+                                                                          },
+                                                               "seq":  {
+                                                                           ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e 0 \u0026\u0026 newData.val() \u003e= now - 90000 \u0026\u0026 newData.val() \u003c= now + 15000"
+                                                                       }
+                                                           },
+                                               "status":  {
+                                                              ".write":  "auth != null \u0026\u0026 auth.uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 $uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027google.com\u0027",
+                                                              ".validate":  "newData.hasChildren([\u0027bridgeAt\u0027,\u0027online\u0027,\u0027recording\u0027,\u0027cameraConnected\u0027,\u0027cloudConnected\u0027,\u0027motionActive\u0027,\u0027pendingUploads\u0027]) \u0026\u0026 newData.child(\u0027bridgeAt\u0027).isNumber() \u0026\u0026 newData.child(\u0027online\u0027).isBoolean() \u0026\u0026 newData.child(\u0027recording\u0027).isBoolean()",
+                                                              "cloudConnected":  {
+                                                                                     ".validate":  "newData.isBoolean()"
+                                                                                 },
+                                                              "uploadedThisSession":  {
+                                                                                          ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e= 0"
+                                                                                      },
+                                                              "uploading":  {
+                                                                                ".validate":  "newData.isBoolean()"
+                                                                            },
+                                                              "recording":  {
+                                                                                ".validate":  "newData.isBoolean()"
+                                                                            },
+                                                              "motionActive":  {
+                                                                                   ".validate":  "newData.isBoolean()"
+                                                                               },
+                                                              "bridgeAt":  {
+                                                                               ".validate":  "newData.isNumber()"
+                                                                           },
+                                                              "lastMotion":  {
+                                                                                 ".validate":  "newData.isString()"
+                                                                             },
+                                                              "updatedAt":  {
+                                                                                ".validate":  "newData.isString()"
+                                                                            },
+                                                              "pendingUploads":  {
+                                                                                     ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e= 0"
+                                                                                 },
+                                                              "appProcess":  {
+                                                                                 ".validate":  "newData.isBoolean()"
+                                                                             },
+                                                              "uploadFailures":  {
+                                                                                     ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e= 0"
+                                                                                 },
+                                                              "online":  {
+                                                                             ".validate":  "newData.isBoolean()"
+                                                                         },
+                                                              "motionDetections":  {
+                                                                                       ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e= 0"
+                                                                                   },
+                                                              "cameraConnected":  {
+                                                                                      ".validate":  "newData.isBoolean()"
+                                                                                  },
+                                                              "$other":  {
+                                                                             ".validate":  "false"
+                                                                         }
+                                                          },
+                                               "ack":  {
+                                                           ".write":  "auth != null \u0026\u0026 auth.uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 $uid === \u0027__OWNER_UID__\u0027 \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027google.com\u0027",
+                                                           ".validate":  "newData.hasChildren([\u0027id\u0027,\u0027seq\u0027,\u0027action\u0027,\u0027phase\u0027,\u0027updatedAt\u0027]) \u0026\u0026 newData.child(\u0027id\u0027).isString() \u0026\u0026 newData.child(\u0027seq\u0027).isNumber() \u0026\u0026 newData.child(\u0027updatedAt\u0027).isNumber() \u0026\u0026 (newData.child(\u0027phase\u0027).val() === \u0027queued\u0027 || newData.child(\u0027phase\u0027).val() === \u0027applied\u0027 || newData.child(\u0027phase\u0027).val() === \u0027failed\u0027)",
+                                                           "id":  {
+                                                                      ".validate":  "newData.isString() \u0026\u0026 newData.val().matches(/^[a-f0-9]{32}$/)"
+                                                                  },
+                                                           "phase":  {
+                                                                         ".validate":  "newData.isString() \u0026\u0026 (newData.val() === \u0027queued\u0027 || newData.val() === \u0027applied\u0027 || newData.val() === \u0027failed\u0027)"
+                                                                     },
+                                                           "detail":  {
+                                                                          ".validate":  "newData.isString()"
+                                                                      },
+                                                           "action":  {
+                                                                          ".validate":  "newData.isString() \u0026\u0026 (newData.val() === \u0027START\u0027 || newData.val() === \u0027STOP\u0027)"
+                                                                      },
+                                                           "seq":  {
+                                                                       ".validate":  "newData.isNumber() \u0026\u0026 newData.val() \u003e 0"
+                                                                   },
+                                                           "updatedAt":  {
+                                                                             ".validate":  "newData.isNumber()"
+                                                                         },
+                                                           "$other":  {
+                                                                          ".validate":  "false"
+                                                                      }
+                                                       }
+                                           }
+                              }
+              }
+}
