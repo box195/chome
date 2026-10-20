@@ -5,3 +5,6 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 let source=await readFile(new URL('../chome.js',import.meta.url),'utf8');
 for(const name of ['app','auth','database'])source=source.replaceAll(`https://www.gstatic.com/firebasejs/11.10.0/firebase-${name}.js`,`firebase/${name}`);
 await build({stdin:{contents:source,resolveDir:root,sourcefile:'chome.js'},bundle:true,minify:true,format:'esm',platform:'browser',target:'es2022',outfile:fileURLToPath(new URL('../chome.bundle.js',import.meta.url)),legalComments:'eof'});
+
+// These static files are deployed unchanged beside the generated bundle.
+for(const file of ["push-sw.js","push-client.js","push-config.json"]) await readFile(new URL("../"+file,import.meta.url),"utf8");

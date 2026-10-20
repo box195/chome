@@ -1,8 +1,10 @@
+import {makePushUI} from "./push-client.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-import {getDatabase,ref,onValue,set} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+import {getDatabase,ref,onValue,set,remove} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
 const app=initializeApp({apiKey:"AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo",authDomain:"chome-a8970.firebaseapp.com",databaseURL:"https://chome-a8970-default-rtdb.firebaseio.com",projectId:"chome-a8970",storageBucket:"chome-a8970.firebasestorage.app",messagingSenderId:"280390101020",appId:"1:280390101020:web:9b34e433a1ab2f4a0797d9"});
 const auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
+const pushUI=makePushUI({auth,db,ref,set,onValue,remove,$,text:(id,msg)=>$(id).textContent=String(msg)});
 let user=null,stopState=null,stopAck=null,state=null,ack=null,lastCount=null,sequence=0,pending=null;
 const text=(id,value)=>$(id).textContent=String(value);
 const pretty=value=>{
@@ -31,10 +33,7 @@ function redraw(){
  $("start").disabled=!user||!bridge||Boolean(pending);
  $("stop").disabled=!user||!bridge||Boolean(pending);
  const count=Number(state?.motionDetections||0);
- if(lastCount!==null && count>lastCount && online && "Notification" in window && Notification.permission==="granted"){
-   new Notification("CHome 움직임 감지",{body:"최근 움직임: "+pretty(state?.lastMotion),tag:"chome-motion-"+count});
- }
- if(online)lastCount=count;
+
 }
 function handleAck(value){
  ack=value;
@@ -70,6 +69,7 @@ $("login").onclick=async()=>{
 };
 onAuthStateChanged(auth,u=>{
  user=u;
+ pushUI.setUser(u);
  if(u){
   $("loginPanel").classList.add("hidden");$("dashboard").classList.remove("hidden");
   listen(u.uid);
@@ -102,12 +102,7 @@ async function send(action){
 }
 $("start").onclick=()=>send("START");
 $("stop").onclick=()=>send("STOP");
-$("logout").onclick=()=>signOut(auth);
-$("notify").onclick=async()=>{
- if(!("Notification" in window)){text("motionInfo","이 브라우저는 알림을 지원하지 않습니다.");return;}
- try{$("notify").textContent=(await Notification.requestPermission())==="granted"?"알림 허용됨":"알림 권한 필요";}
- catch(e){text("motionInfo","알림 설정 실패: "+e.message);}
-};
+$("logout").onclick=async()=>{try{await pushUI.disable();await signOut(auth);}catch(e){text("motionInfo","로그아웃 실패: "+(e.code||"연결을 확인하세요"));}};
 $("link").onclick=async()=>{
  if(!user)return;
  const code=$("code").value.toUpperCase().replace(/[^0-9A-F]/g,"");

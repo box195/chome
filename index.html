@@ -18,6 +18,7 @@ button:disabled{opacity:.5;cursor:not-allowed}input{width:100%;background:#09152
 .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pill{border-radius:30px;border:1px solid #52677e;padding:6px 10px;font-size:.8rem}
 footer{text-align:center;color:#8d9bb0;font-size:.8rem;padding:22px}
+#pairPanel{display:none}body.local-pair #pairPanel{display:block}
 </style>
 </head>
 <body><main>
@@ -39,14 +40,16 @@ footer{text-align:center;color:#8d9bb0;font-size:.8rem;padding:22px}
 <div><small>업로드 대기</small><strong id="pending">-</strong></div>
 <div><small>움직임 감지</small><strong id="motion">-</strong></div>
 </div><p id="lastMotion" class="notice">최근 감지: -</p></section>
-<section class="panel"><h2>PC 최초 연결</h2>
+<section class="panel" id="pairPanel"><h2>PC 최초 연결</h2>
 <p>최초 연결은 카메라 PC에서 http://localhost:18742/chome.html 을 열어 진행하세요. 연결 후 휴대폰에서는 이 웹앱만 사용하며 Tailscale이 필요 없습니다.</p>
 <input id="code" maxlength="10" autocomplete="off" placeholder="10자리 페어링 코드">
 <button id="link" class="dark wide">Firebase와 PC 연결</button>
 <p id="linkFeedback" class="notice" role="status">연결 후 원격 제어에 Tailscale은 필요하지 않습니다.</p></section>
-<section class="panel"><h2>움직임 알림</h2>
-<button id="notify" class="dark">페이지 알림 허용</button><p id="motionInfo" class="notice">페이지가 열려 있을 때만 브라우저 알림을 표시합니다. 백그라운드 푸시 알림은 제공하지 않습니다.</p></section>
+<section class="panel" id="pushPanel"><h2>휴대폰 움직임 알림</h2>
+<p>알림을 켜면 이 페이지를 열어 두지 않아도 Android에 푸시 알림이 도착할 수 있습니다. Chrome 사이트 알림 권한과 PC 연결이 필요합니다.</p>
+<div class="buttons"><button id="notify" class="blue">휴대폰 알림 켜기</button><button id="pushTest" class="dark" disabled>시험 알림 보내기</button></div>
+<p id="motionInfo" class="notice" role="status">로그인 후 푸시 설정을 확인합니다.</p></section>
 <button id="logout" class="dark wide">로그아웃</button>
 </div>
 <footer>CHome · Firebase · GitHub Pages<br>영상은 PC와 네이버 MYBOX에 저장되며 이 페이지에 업로드되지 않습니다.</footer>
-</main><script type="module" src="./chome.bundle.js?v=live-v2-20261020"></script></body></html>
+</main><script>if(['localhost','127.0.0.1'].includes(location.hostname))document.body.classList.add('local-pair');</script><script type="module" src="./chome.bundle.js?v=web-push-v1-20261020"></script></body></html>

@@ -12,13 +12,18 @@ GitHub Pages → Firebase Realtime Database → Windows USB 카메라의 녹화�
 
 `Firebase에 명령 등록`은 전송 단계입니다. **녹화기 실행 확인**이 표시되어야 PC의 처리 영수증과 실제 녹화 상태가 확인된 것입니다. 상태가 20초 이상 갱신되지 않으면 연결 끊김으로 표시합니다. 90초 이상 지난 명령, 중복 ID 및 역순 명령은 재실행하지 않습니다.
 
-움직임 알림은 페이지가 열려 있을 때만 지원합니다. 웹앱을 닫은 뒤의 FCM 푸시는 구현하지 않았고, 유료 요금제나 결제 설정도 필요하지 않습니다.
+Android Chrome에서 **휴대폰 알림 켜기 → 허용 → 시험 알림 보내기**를 누릅니다. PC가 표준 Web Push로 발송하고 서비스 워커가 알림을 표시하므로 페이지를 열어 둔 경우와 탭을 닫은 경우 모두 같은 경로를 사용합니다. 시험 결과의 `푸시 서버 발송 성공`은 실제 휴대폰 표시 확인과 구분됩니다. PC와 인터넷이 켜져 있어야 하며 Chrome 강제 종료, Android 알림 차단·절전 제한은 수신을 막을 수 있습니다. 움직임 알림 간격은 최소 120초입니다. 로그아웃하면 해당 기기의 구독을 해제합니다. 유료 서비스나 Firebase 요금제 변경은 사용하지 않습니다.
+
+`PC 최초 연결` 코드는 설치할 때 PC에서 한 번 사용하는 기능입니다. 이미 연결된 휴대폰의 공개 페이지에는 표시하지 않습니다.
 
 ## 소스와 빌드
 
 - `chome.js`: Firebase 웹 클라이언트 소스, `chome.bundle.js`: 동일 출처에서 제공하는 Firebase SDK 포함 배포본.
 - `windows/recorder`: 기존 1초 TS 저장·MYBOX·움직임 감지와 새 명령 처리 소스.
 - `windows/relay`: Google 소유자 인증, DPAPI 보호, 명령 수신·실제 처리 결과 확인.
+- `windows/push-sender`: PC Web Push 발송기. `npm ci`로 의존성을 설치하고 `ReadPushSecrets.cs`를 .NET Framework 컴파일러에서 System.Security.dll 및 System.Web.Extensions.dll 참조로 빌드합니다. 이 폴더를 수신기 옆 `push-sender/`에 놓으면 수신기가 실행·재실행을 관리합니다. `node --test core.test.mjs`로 유효성 검사를 실행합니다.
+
+푸시 VAPID 개인 키는 PC에서 생성하고 `CHome-WebPush-v1` 엔트로피의 Windows DPAPI CurrentUser로 보호한 `push-vapid.dat`에 저장합니다. 공개 키만 `push-config.json`에 게시합니다. 기존 Firebase 갱신 토큰도 현재 Windows 사용자의 암호화 파일에서 읽으며 관리자 키는 사용하지 않습니다. 개인 키를 바꾸면 휴대폰에서 다시 등록해야 합니다. 발송기는 구독·시험 요청·결과를 소유자 전용 `push/` 경로에 기록하며 오래된 시험 요청과 재시작 전 움직임을 재발송하지 않습니다.
 
 웹: Node.js 설치 후 `npm install`, `npm run build`. GitHub Pages는 main 브랜치 루트를 게시합니다.
 

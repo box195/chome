@@ -34,12 +34,25 @@ class HomeCamRemote {
    var listener=new HttpListener();
    listener.Prefixes.Add("http://127.0.0.1:18742/"); listener.Prefixes.Add("http://localhost:18742/");
    listener.Start(); CHomeCloud.Start();
+   var pushThread=new Thread(PushLoop){IsBackground=true,Name="CHome-Push-Watchdog"};pushThread.Start();
    Console.WriteLine("REMOTECAM_READY port=18742 pairCodeStoredLocally=true");
    while(true){
     var ctx=listener.GetContext();
     ThreadPool.QueueUserWorkItem(o=>{try{Handle((HttpListenerContext)o);}catch(Exception e){Console.Error.WriteLine("REQUEST_ERROR "+e.GetType().Name);}},ctx);
    }
   }catch(Exception e){Console.Error.WriteLine("FATAL "+e.GetType().Name+": "+e.Message);return 2;}
+ }
+ static void PushLoop(){
+  while(true){
+   try{
+    string script=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"push-sender","sender.mjs");
+    string node=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"nodejs","node.exe");
+    if(File.Exists(script)&&File.Exists(node)){
+     using(var p=Process.Start(new ProcessStartInfo(node,"\""+script+"\""){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden}))p.WaitForExit();
+    }
+   }catch{}
+   Thread.Sleep(30000);
+  }
  }
  static void Handle(HttpListenerContext ctx){
   var req=ctx.Request;
