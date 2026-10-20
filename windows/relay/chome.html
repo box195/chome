@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>CHome 원격 홈카메라</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif}*{box-sizing:border-box}
+body{background:#091421;color:#e6f2ff;margin:0;padding:22px 14px}main{max-width:560px;margin:auto}
+h1{font-size:1.6rem;margin:12px 0 22px}h2{font-size:1.08rem;margin:0 0 14px}p,small{color:#a8bdd4;line-height:1.55}
+.panel{padding:21px;border:1px solid #344a65;border-radius:18px;background:#132438;margin:12px 0}
+button,input{font:inherit;border-radius:12px;padding:13px;border:0}button{cursor:pointer;font-weight:700}
+button:disabled{opacity:.5;cursor:not-allowed}input{width:100%;background:#091521;border:1px solid #476281;color:white;margin-bottom:12px}
+.blue{background:#84ceff;color:#092338}.dark{background:#294158;color:#e0efff}.red{background:#6f3e46;color:#fff}
+.wide{width:100%}.buttons,.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats div{background:#0b1b2b;padding:13px;border-radius:10px}.stats strong{display:block;margin:5px 0}
+.hidden{display:none}.notice{font-size:.86rem;overflow-wrap:anywhere}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pill{border-radius:30px;border:1px solid #52677e;padding:6px 10px;font-size:.8rem}
+footer{text-align:center;color:#8d9bb0;font-size:.8rem;padding:22px}
+</style>
+</head>
+<body><main>
+<div class="row"><h1>📷 CHome</h1><span id="badge" class="pill">로그인 필요</span></div>
+<section class="panel" id="loginPanel">
+<h2>내 홈카메라</h2><p>소유자 Google 계정으로만 원격 상태 조회와 녹화 제어를 할 수 있습니다.</p>
+<button id="login" class="blue wide">Google 로그인</button><p id="loginFeedback" class="notice" role="status"></p>
+</section>
+<div id="dashboard" class="hidden">
+<section class="panel">
+<h2 id="status">PC 상태 확인 중</h2><p id="updated" class="notice">연결 확인 중</p>
+<div class="buttons"><button id="start" class="blue" disabled>녹화 시작</button><button id="stop" class="red" disabled>녹화 중지</button></div>
+<p id="feedback" class="notice" role="status">명령 처리 대기</p>
+</section>
+<section class="panel">
+<h2>녹화 및 업로드 상태</h2><div class="stats">
+<div><small>카메라</small><strong id="camera">-</strong></div>
+<div><small>네이버 MYBOX</small><strong id="cloud">-</strong></div>
+<div><small>업로드 대기</small><strong id="pending">-</strong></div>
+<div><small>움직임 감지</small><strong id="motion">-</strong></div>
+</div><p id="lastMotion" class="notice">최근 감지: -</p></section>
+<section class="panel"><h2>PC 최초 연결</h2>
+<p>최초 연결은 카메라 PC에서 http://localhost:18742/chome.html 을 열어 진행하세요. 연결 후 휴대폰에서는 이 웹앱만 사용하며 Tailscale이 필요 없습니다.</p>
+<input id="code" maxlength="10" autocomplete="off" placeholder="10자리 페어링 코드">
+<button id="link" class="dark wide">Firebase와 PC 연결</button>
+<p id="linkFeedback" class="notice" role="status">연결 후 원격 제어에 Tailscale은 필요하지 않습니다.</p></section>
+<section class="panel"><h2>움직임 알림</h2>
+<button id="notify" class="dark">페이지 알림 허용</button><p id="motionInfo" class="notice">페이지가 열려 있을 때만 브라우저 알림을 표시합니다. 백그라운드 푸시 알림은 제공하지 않습니다.</p></section>
+<button id="logout" class="dark wide">로그아웃</button>
+</div>
+<footer>CHome · Firebase · GitHub Pages<br>영상은 PC와 네이버 MYBOX에 저장되며 이 페이지에 업로드되지 않습니다.</footer>
+</main><script type="module" src="./chome.js"></script></body></html>

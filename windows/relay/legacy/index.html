@@ -1,0 +1,60 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>HomeCam · 원격 제어</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#e8eef9;background:#09111e;font-size:15px}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse 90% 50% at 50% -15%,#143453 0%,#09111e 80%);padding:env(safe-area-inset-top) 16px calc(30px + env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto}header{display:flex;justify-content:space-between;align-items:center;margin:32px 0 25px}.brand{font-weight:800;font-size:1.45rem;letter-spacing:-.06em}small,.muted{color:#97a6c0}.tag{border:1px solid #33445b;border-radius:99px;padding:7px 12px;font-size:.8rem;color:#a9bad3}.tag.good{color:#7ce1a9;border-color:#237454}.tag.bad{color:#f0aa9b;border-color:#744338}
+.panel{background:#111e30;border:1px solid #27364b;border-radius:20px;padding:21px;margin-bottom:15px;box-shadow:0 10px 32px #0002}h1,h2,p{margin:0}h1{font-size:1.3rem;margin-bottom:8px}h2{font-size:1rem;margin-bottom:17px}.intro{font-size:.91rem;color:#a8b6cc;line-height:1.6;margin-bottom:20px}
+input{width:100%;font-size:17px;letter-spacing:.09em;border:1px solid #3d526d;background:#0b1523;color:white;border-radius:12px;padding:15px;outline:none;margin:12px 0}input:focus{border-color:#59a4ff}button{font:inherit;border:0;cursor:pointer;border-radius:12px;font-weight:700;min-height:53px;padding:12px 16px}button:disabled{opacity:.55;cursor:not-allowed}
+.primary{background:#72bdff;color:#07182c}.secondary{background:#22364c;color:#e6f3ff}.stop{background:#422c35;color:#ffbfc5;border:1px solid #74424f}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:11px}.action{display:flex;flex-direction:column;align-items:flex-start;gap:7px;text-align:left;min-height:100px}.action .emoji{font-size:1.5rem}.action small{font-size:.75rem}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}.stat{background:#0a1727;border-radius:12px;padding:14px}.stat b{display:block;margin-top:7px;font-size:1.1rem;font-variant-numeric:tabular-nums}.stat small{font-size:.77rem}
+.full{width:100%}.hidden{display:none!important}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.dot{width:9px;height:9px;display:inline-block;border-radius:50%;background:#8492a9;margin-right:7px}.dot.green{background:#59daa3}.dot.red{background:#e9a39e}.log{padding:12px;border-radius:11px;background:#0a1727;font-size:.83rem;color:#acbcd0;min-height:48px;line-height:1.55}.sub{font-size:.8rem;color:#8d9db4;margin-top:12px;line-height:1.55}
+footer{padding:17px 8px;color:#74849b;font-size:.78rem;text-align:center;line-height:1.8}
+@media(max-width:350px){.actions{gap:7px}.panel{padding:15px}}
+</style>
+<script src="./app.js" defer></script>
+</head>
+<body>
+<main>
+<header><div><div class="brand">◉ HomeCam</div><small>나만의 카메라 관제실</small></div><span id="connection" class="tag">연결 확인 중</span></header>
+<section class="panel" id="pairPanel">
+<h1>휴대폰 연결</h1>
+<p class="intro">PC에서 발급된 10자리 연결 코드를 입력하세요. 녹화 영상이나 MYBOX 인증 정보가 이 웹사이트로 전송되지는 않습니다.</p>
+<label for="code">연결 코드</label>
+<input id="code" placeholder="10자리 연결 코드" maxlength="10" autocomplete="off" spellcheck="false">
+<button id="pair" class="primary full">내 PC 연결하기</button>
+<p id="pairFeedback" class="sub"></p>
+</section>
+<div id="dashboard" class="hidden">
+<section class="panel">
+<div class="row"><div><h1 id="bigStatus">상태 확인 중</h1><p id="lastSeen" class="intro" style="margin:4px 0 0">PC 연결을 확인하고 있습니다</p></div><div id="recordingLight" style="font-size:2rem">◌</div></div>
+<div class="actions">
+<button id="start" class="primary action"><span class="emoji">▶</span><span>녹화 시작</span><small>PC 카메라 켜기</small></button>
+<button id="stop" class="stop action"><span class="emoji">■</span><span>녹화 중지</span><small>카메라 감시 중단</small></button>
+</div>
+<p id="commandFeedback" class="sub">명령은 PC에서 처리될 때 완료됩니다.</p>
+</section>
+<section class="panel"><div class="row"><h2>실시간 상태</h2><button id="refresh" class="secondary" style="min-height:35px">새로고침</button></div>
+<div class="stats">
+<div class="stat"><small>카메라</small><b id="camera">—</b></div>
+<div class="stat"><small>MYBOX 연결</small><b id="cloud">—</b></div>
+<div class="stat"><small>업로드 대기</small><b id="pending">—</b></div>
+<div class="stat"><small>움직임 감지</small><b id="motion">—</b></div>
+</div>
+</section>
+<section class="panel"><div class="row"><h2>움직임 알림</h2><button id="enableNotifications" class="secondary" style="min-height:38px">알림 켜기</button></div>
+<div class="log" id="activity">감지 이벤트를 확인하고 있습니다.</div>
+<p class="sub">이 화면이 열린 동안 상태를 확인하고 휴대폰에 알림을 표시합니다. 웹앱을 닫은 뒤에도 오는 푸시 알림은 아직 지원하지 않습니다.</p>
+</section>
+<button class="secondary full" id="logout">휴대폰 연결 해제</button>
+</div>
+<footer>Tailscale 연결 전용 · 무인증 공개 접속 불가<br>PC가 꺼져 있으면 원격 녹화 명령도 실행되지 않습니다.</footer>
+</main>
+</body>
+</html>
