@@ -52,7 +52,7 @@ async function tick(){
   let result={phase:'failed',detail:'expired_or_invalid_request'};
   // Persist a receipt before sending: a crash must never replay an old test.
   const deviceId=/^[a-f0-9]{32}$/.test(request?.deviceId||'')?request.deviceId:'0'.repeat(32);
-  await db('receipts/'+id,'PUT',{deviceId,phase:'failed',detail:'interrupted_before_confirmation',updatedAt:Date.now()});
+  await db('receipts/'+id,'PUT',{deviceId,phase:'processing',detail:'sending',updatedAt:Date.now()});
   if(freshRequest(request,uid))result=await send(deviceId,subscriptions[deviceId],{type:'test',id});
   await db('receipts/'+id,'PUT',{deviceId,...result,updatedAt:Date.now()});
   await db('testRequests/'+id,'DELETE');

@@ -112,6 +112,7 @@ export function makePushUI({auth, db, ref, set, onValue, remove, $, text}) {
           const receipt = snap.val();
           if (!receipt) return;
           if (receipt.deviceId !== device) return;
+          if(receipt.phase !== 'sent' && receipt.phase !== 'failed') return;
           finish(null,receipt);
         }, error => finish(error));
         if (settled && unsub) unsub();

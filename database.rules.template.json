@@ -155,7 +155,7 @@
                 ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
               },
               "phase": {
-                ".validate": "newData.val() === 'sent' || newData.val() === 'failed'"
+                ".validate": "newData.val() === 'sent' || newData.val() === 'failed' || newData.val() === 'processing'"
               },
               "detail": {
                 ".validate": "newData.isString() && newData.val().length <= 100"
