@@ -16,7 +16,7 @@ export function createTabletUI({db,ref,onValue,set,remove,$}) {
     '<p class="notice" role="status" id="tabletFeedback">연결을 기다리는 중</p>',
     '<details><summary>Y700 최초 연결 / 연결 해제</summary>',
     '<p class="notice">Y700 앱에서 표시된 기기 UID를 입력하세요. 로그인한 소유자만 연결할 수 있습니다.</p>',
-    '<input id="tabletDeviceUid" autocomplete="off" placeholder="Y700 앱에 표시된 기기 UID">',
+    '<input id="tabletDeviceUid" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Y700 앱에 표시된 기기 UID (대소문자 구분)">',
     '<button id="tabletPair" class="dark">Y700 연결</button><button id="tabletUnpair" class="dark">Y700 연결 해제</button>',
     '<p class="notice" id="tabletPairFeedback" role="status"></p>',
     '<p class="notice">태블릿에 입력할 소유자 UID: <code id="tabletOwnerUid">로그인 후 표시</code></p></details>'
@@ -41,7 +41,6 @@ export function createTabletUI({db,ref,onValue,set,remove,$}) {
     get("tabletPair").disabled=!user;
     get("tabletUnpair").disabled=!user||!paired;
     message("tabletOwnerUid",user?.uid||"로그인 후 표시");
-    if(paired&&get("tabletDeviceUid").value!==configuredUid)get("tabletDeviceUid").value=configuredUid;
   }
   async function command(action){
     if(!user||!online()||pending)return;
@@ -72,7 +71,12 @@ export function createTabletUI({db,ref,onValue,set,remove,$}) {
     cleanup();user=next||null;
     if(!user){render();return;}
     const root=devicePath();
-    listeners.push(onValue(ref(db,root+"/authUid"),s=>{configuredUid=s.val();render();},e=>message("tabletPairFeedback","조회 실패: "+e.code)));
+    listeners.push(onValue(ref(db,root+"/authUid"),s=>{
+      configuredUid=s.val();
+      const input=get("tabletDeviceUid");
+      if(document.activeElement!==input)input.value=configuredUid||"";
+      render();
+    },e=>message("tabletPairFeedback","조회 실패: "+e.code)));
     listeners.push(onValue(ref(db,root+"/status"),s=>{status=s.val();render();},e=>message("tabletFeedback","상태 조회 실패: "+e.code)));
     listeners.push(onValue(ref(db,root+"/ack"),s=>{
       const ack=s.val();
