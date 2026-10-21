@@ -9,7 +9,7 @@ public final class CHomeApp extends Application {
         super.onCreate();
         if(FirebaseApp.getApps(this).isEmpty()) {
             FirebaseOptions options=new FirebaseOptions.Builder()
-                .setApplicationId("1:280390101020:android:chomey700")
+                .setApplicationId("1:280390101020:android:7f46c72091c79eac0797d9")
                 .setApiKey("AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo")
                 .setDatabaseUrl("https://chome-a8970-default-rtdb.firebaseio.com")
                 .setProjectId("chome-a8970")
