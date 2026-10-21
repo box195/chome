@@ -195,7 +195,8 @@
           "y700": {
             "authUid": {
               ".write": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
-              ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{15,128}$/)"
+              ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{15,128}$/)",
+              ".read": "auth != null && $uid === '__OWNER_UID__' && auth.uid === data.val()"
             },
             "command": {
               ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients/'+$uid+'/devices/y700/authUid').val()",

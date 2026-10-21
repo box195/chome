@@ -77,7 +77,18 @@ public final class MonitorService extends LifecycleService {
         lastCommandSeq=Settings.publicPrefs(this).getLong("lastY700CommandSeq",0L);
         setLocalState("카메라 연결 중");
         prepareCamera();
-        attachFirebase();
+        // Wait for a fresh authenticated ID token before opening protected RTDB listeners.
+        setLocalState("Firebase 인증 토큰 확인 중");
+        account.getIdToken(true).addOnCompleteListener(result -> {
+            if(closing)return;
+            if(!result.isSuccessful() || result.getResult()==null || result.getResult().getToken()==null) {
+                setLocalState("Firebase 토큰 발급 실패: "+(result.getException()==null?
+                    "unknown":result.getException().getClass().getSimpleName()));
+                return;
+            }
+            setLocalState("Firebase 인증 완료 / Y700 연결 확인 중");
+            verifyPairAndAttach();
+        });
         MyboxUploadWorker.schedule(this);
         main.post(ticker);
         return START_NOT_STICKY; // background camera re-start is not allowed by recent Android versions
@@ -169,6 +180,26 @@ public final class MonitorService extends LifecycleService {
         Recording previous=recording;recording=null;
         if(previous!=null){try{previous.stop();}catch(Exception ignored){}}
     }
+    private void verifyPairAndAttach() {
+        String path="clients/"+ownerUid+"/devices/y700/authUid";
+        FirebaseDatabase.getInstance().getReference(path)
+            .addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if(closing)return;
+                    String approved=snapshot.getValue(String.class);
+                    if(!myUid.equals(approved)){
+                        setLocalState("Y700 기기 UID 미등록 또는 불일치: CHome에서 Y700 연결 다시 확인");
+                        return;
+                    }
+                    setLocalState("Firebase 기기 승인 확인 완료 / 명령 연결 중");
+                    attachFirebase();
+                    publishState();
+                }
+                @Override public void onCancelled(@NonNull DatabaseError error) {
+                    setLocalState("Firebase 기기 승인 조회 실패: "+error.getCode()+" "+error.getMessage());
+                }
+            });
+    }
     private void attachFirebase(){
         deviceRef=FirebaseDatabase.getInstance().getReference("clients/"+ownerUid+"/devices/y700");
         commandRef=deviceRef.child("command");
@@ -197,7 +228,7 @@ public final class MonitorService extends LifecycleService {
                 }else ack(id,seq,action,"failed","unknown_action_or_mode");
             }
             @Override public void onCancelled(@NonNull DatabaseError error){
-                setLocalState("Firebase 연결 권한 확인 필요: "+error.getCode());
+                setLocalState("Firebase 명령 읽기 실패: "+error.getCode()+" "+error.getMessage());
             }
         };
         commandRef.addValueEventListener(commandListener);
@@ -224,7 +255,9 @@ public final class MonitorService extends LifecycleService {
         data.put("motionDetections",motionDetections);data.put("lastMotion",lastMotion);
         data.put("localClips",local);data.put("uploadedClips",uploaded);
         data.put("pendingUploads",local-uploaded);data.put("cloudConnected",!Settings.token(this).isEmpty());
-        deviceRef.child("status").setValue(data);
+        deviceRef.child("status").setValue(data,(error,ref)->{
+            if(error!=null && !closing)setLocalState("Firebase 상태 쓰기 실패: "+error.getCode()+" "+error.getMessage());
+        });
     }
     private void setLocalState(String text){
         Settings.publicPrefs(this).edit().putString("monitorState",text).apply();
