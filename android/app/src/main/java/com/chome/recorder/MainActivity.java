@@ -19,13 +19,14 @@ import com.google.firebase.auth.FirebaseUser;
 
 public final class MainActivity extends Activity {
     private final Handler main=new Handler(Looper.getMainLooper());
-    private TextView account, current, help;
+    private TextView account, current, help, pushState;
     private EditText owner, pat,folder;
     private String deviceUid="";
     private boolean startAfterPermission=false;
     private final Runnable refresh=new Runnable() {
         @Override public void run() {
             if(current!=null)current.setText("서비스 상태: "+Settings.publicPrefs(MainActivity.this).getString("monitorState","중지됨"));
+            if(pushState!=null)pushState.setText("웹푸시 발송: "+Settings.publicPrefs(MainActivity.this).getString("tabletPushStatus","설정 대기"));
             main.postDelayed(this,2000);
         }
     };
@@ -60,6 +61,12 @@ public final class MainActivity extends Activity {
             Settings.publicPrefs(this).edit().putString("monitorState","종료 요청됨").apply();
         });
         current=label("서비스 상태: 확인 중");base.addView(current);
+        pushState=label("웹푸시 발송: 설정 대기");base.addView(pushState);
+        Button battery=button("백그라운드 배터리 제한 해제 설정 열기",base);
+        battery.setOnClickListener(v->{
+            Intent screen=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:"+getPackageName()));startActivity(screen);
+        });
         help=label("폰 CHome에서 Y700 시작/중지를 눌러 움직임 또는 상시 녹화 모드를 변경할 수 있습니다.\n"
             +"화면을 끈 상태의 감시는 태블릿 OS 설정에 따라 다를 수 있습니다. 첫 설치 후 실제 장시간 테스트가 필요합니다.\n"
             +"감시 서비스가 완전히 꺼져 있거나 앱이 강제 종료되면 원격으로 카메라를 다시 켤 수 없습니다.\n"

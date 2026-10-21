@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.ServiceInfo;
 import android.os.*;
+import android.net.wifi.WifiManager;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.camera.core.*;
@@ -28,6 +29,9 @@ public final class MonitorService extends LifecycleService {
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ExecutorService analyzer=Executors.newSingleThreadExecutor();
     private final MotionDetector detector=new MotionDetector();
+    private PowerManager.WakeLock cpuLock;
+    private WifiManager.WifiLock wifiLock;
+    private TabletPushSender pushSender;
     private ProcessCameraProvider provider;
     private VideoCapture<Recorder> video;
     private Recording recording;
@@ -57,6 +61,7 @@ public final class MonitorService extends LifecycleService {
     @Override public void onCreate(){
         super.onCreate();
         createChannel();
+        holdScreenOffResources();
         Notification n=new NotificationCompat.Builder(this,CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentTitle("CHome Y700 카메라 대기")
@@ -92,6 +97,24 @@ public final class MonitorService extends LifecycleService {
         MyboxUploadWorker.schedule(this);
         main.post(ticker);
         return START_NOT_STICKY; // background camera re-start is not allowed by recent Android versions
+    }
+    private void holdScreenOffResources(){
+        try{
+            PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
+            if(pm!=null){
+                cpuLock=pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"CHome:recordingCpu");
+                cpuLock.setReferenceCounted(false);
+                cpuLock.acquire();
+            }
+        }catch(Exception e){setLocalState("CPU wakelock unavailable");}
+        try{
+            WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+            if(wm!=null){
+                wifiLock=wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF,"CHome:recordingWifi");
+                wifiLock.setReferenceCounted(false);
+                wifiLock.acquire();
+            }
+        }catch(Exception e){setLocalState("WiFi wakelock unavailable");}
     }
     private void createChannel() {
         NotificationManager manager=getSystemService(NotificationManager.class);
@@ -151,6 +174,7 @@ public final class MonitorService extends LifecycleService {
         }
         lastMotionElapsed=now;
         if(recording==null && cameraReady)beginClip();
+        if(pushSender!=null)pushSender.motion(System.currentTimeMillis());
     }
     private void beginClip(){
         if(closing||recording!=null||finalizingClip||!cameraReady||mode.equals("OFF"))return;
@@ -193,6 +217,7 @@ public final class MonitorService extends LifecycleService {
                     }
                     setLocalState("Firebase 기기 승인 확인 완료 / 명령 연결 중");
                     attachFirebase();
+                    if(pushSender==null)pushSender=new TabletPushSender(MonitorService.this,ownerUid);
                     publishState();
                 }
                 @Override public void onCancelled(@NonNull DatabaseError error) {
@@ -269,6 +294,9 @@ public final class MonitorService extends LifecycleService {
             offline.put("cameraConnected",false);offline.put("mode","OFF");offline.put("bridgeAt",System.currentTimeMillis());
             deviceRef.child("status").updateChildren(offline);}
         try{if(provider!=null)provider.unbindAll();}catch(Exception e){}
+        if(pushSender!=null)pushSender.close();
+        if(wifiLock!=null && wifiLock.isHeld())wifiLock.release();
+        if(cpuLock!=null && cpuLock.isHeld())cpuLock.release();
         analyzer.shutdownNow();setLocalState("감시 서비스 종료");
         super.onDestroy();
     }

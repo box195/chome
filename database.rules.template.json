@@ -127,7 +127,8 @@
               "$other": {
                 ".validate": false
               }
-            }
+            },
+            ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()"
           },
           "testRequests": {
             "$id": {
@@ -210,6 +211,23 @@
             "ack": {
               ".write": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients/'+$uid+'/devices/y700/authUid').val()",
               ".validate": "newData.hasChildren(['id','seq','action','phase','detail','updatedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val()>0 && (newData.child('action').val()==='START' || newData.child('action').val()==='STOP') && (newData.child('phase').val()==='queued' || newData.child('phase').val()==='applied' || newData.child('phase').val()==='failed') && newData.child('detail').isString() && newData.child('updatedAt').isNumber()"
+            },
+            "pushVapid": {
+              ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()",
+              ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+              ".validate": "newData.hasChildren(['subject','publicKey','privateKey'])",
+              "subject": {
+                ".validate": "newData.isString() && newData.val().length <= 200 && newData.val().beginsWith('https://')"
+              },
+              "publicKey": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{87}=?$/)"
+              },
+              "privateKey": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{43}=?$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
             }
           }
         }
