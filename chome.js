@@ -1,9 +1,11 @@
+import {createTabletUI} from "./tablet-ui.js";
 import {makePushUI} from "./push-client.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getDatabase,ref,onValue,set,remove} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
 const app=initializeApp({apiKey:"AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo",authDomain:"chome-a8970.firebaseapp.com",databaseURL:"https://chome-a8970-default-rtdb.firebaseio.com",projectId:"chome-a8970",storageBucket:"chome-a8970.firebasestorage.app",messagingSenderId:"280390101020",appId:"1:280390101020:web:9b34e433a1ab2f4a0797d9"});
 const auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
+const tabletUI=createTabletUI({db,ref,onValue,set,remove,$});
 const pushUI=makePushUI({auth,db,ref,set,onValue,remove,$,text:(id,msg)=>$(id).textContent=String(msg)});
 let user=null,stopState=null,stopAck=null,state=null,ack=null,lastCount=null,sequence=0,pending=null;
 const text=(id,value)=>$(id).textContent=String(value);
@@ -70,6 +72,7 @@ $("login").onclick=async()=>{
 onAuthStateChanged(auth,u=>{
  user=u;
  pushUI.setUser(u);
+ tabletUI.setUser(u);
  if(u){
   $("loginPanel").classList.add("hidden");$("dashboard").classList.remove("hidden");
   listen(u.uid);
