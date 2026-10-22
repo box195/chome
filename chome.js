@@ -1,4 +1,5 @@
 import {createTabletUI} from "./tablet-ui.js";
+import {makeLiveView} from "./live-view.js";
 import {makePushUI} from "./push-client.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
@@ -6,7 +7,9 @@ import {getDatabase,ref,onValue,set,remove} from "https://www.gstatic.com/fireba
 const app=initializeApp({apiKey:"AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo",authDomain:"chome-a8970.firebaseapp.com",databaseURL:"https://chome-a8970-default-rtdb.firebaseio.com",projectId:"chome-a8970",storageBucket:"chome-a8970.firebasestorage.app",messagingSenderId:"280390101020",appId:"1:280390101020:web:9b34e433a1ab2f4a0797d9"});
 const auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
 const tabletUI=createTabletUI({db,ref,onValue,set,remove,$});
+const liveUI=makeLiveView({db,ref,set,remove,onValue,$});
 const pushUI=makePushUI({auth,db,ref,set,onValue,remove,$,text:(id,msg)=>$(id).textContent=String(msg)});
+let pcModeInitialized=false;
 let user=null,stopState=null,stopAck=null,state=null,ack=null,lastCount=null,sequence=0,pending=null;
 const text=(id,value)=>$(id).textContent=String(value);
 const pretty=value=>{
@@ -35,6 +38,10 @@ function redraw(){
  $("start").disabled=!user||!bridge||Boolean(pending);
  $("stop").disabled=!user||!bridge||Boolean(pending);
  const count=Number(state?.motionDetections||0);
+ const mode=state?.mode;
+ if(!pcModeInitialized&&(mode==="MOTION"||mode==="CONTINUOUS")){
+   $("pcMode").value=mode;pcModeInitialized=true;
+ }
 
 }
 function handleAck(value){
@@ -52,7 +59,7 @@ function handleAck(value){
 }
 function stopListeners(){
  if(stopState)stopState();if(stopAck)stopAck();
- stopState=stopAck=null;state=ack=null;pending=null;lastCount=null;redraw();
+ stopState=stopAck=null;state=ack=null;pending=null;lastCount=null;pcModeInitialized=false;redraw();
 }
 function listen(uid){
  stopListeners();
@@ -73,6 +80,7 @@ onAuthStateChanged(auth,u=>{
  user=u;
  pushUI.setUser(u);
  tabletUI.setUser(u);
+ liveUI.setUser(u);
  if(u){
   $("loginPanel").classList.add("hidden");$("dashboard").classList.remove("hidden");
   listen(u.uid);
@@ -91,7 +99,7 @@ async function send(action){
  pending={id,seq,action};
  redraw();
  try{
-  await set(ref(db,"clients/"+user.uid+"/command"),{id,seq,action,requester:user.uid,issuedAt:Date.now()});
+  await set(ref(db,"clients/"+user.uid+"/command"),{id,seq,action,mode:action==="START"?$("pcMode").value:"",requester:user.uid,issuedAt:Date.now()});
   // An accepted write is NOT a recorder acknowledgement.
   text("feedback","Firebase에 명령 등록됨. PC 실제 실행 확인을 기다립니다.");
   if(ack?.id===id)handleAck(ack);

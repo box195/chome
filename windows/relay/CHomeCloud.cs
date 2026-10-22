@@ -41,7 +41,7 @@ static class CHomeCloud {
     var saved=Parse(File.ReadAllText(PendingFile,Encoding.UTF8));
     long seq,issued;
     if(long.TryParse(GetValue(saved,"seq"),out seq) && long.TryParse(GetValue(saved,"issuedAt"),out issued)){
-     Pending=new CloudCommand{Seq=seq,Id=GetValue(saved,"id"),Action=GetValue(saved,"action"),IssuedAt=issued};
+     Pending=new CloudCommand{Seq=seq,Id=GetValue(saved,"id"),Action=GetValue(saved,"action"),Mode=GetValue(saved,"mode"),IssuedAt=issued};
     }
    }
   }catch{Pending=null;}
@@ -167,7 +167,7 @@ static class CHomeCloud {
   LastSeq=seq;
  }
  static void SavePending(CloudCommand cmd) {
-  File.WriteAllText(PendingFile,J.Serialize(new{id=cmd.Id,seq=cmd.Seq,action=cmd.Action,issuedAt=cmd.IssuedAt}),Encoding.UTF8);
+  File.WriteAllText(PendingFile,J.Serialize(new{id=cmd.Id,seq=cmd.Seq,action=cmd.Action,mode=cmd.Mode,issuedAt=cmd.IssuedAt}),Encoding.UTF8);
   Pending=cmd;
  }
  static void ClearPending() {
@@ -188,6 +188,7 @@ static class CHomeCloud {
   var s=new Dictionary<string,object>{
    {"bridgeAt",now},{"online",connected},{"appProcess",IsRecorderRunning()},
    {"recording",connected && CloudProtocol.Field(local,"recording")=="True"},
+   {"mode",connected?CloudProtocol.Field(local,"mode"):"OFF"},
    {"cameraConnected",connected && CloudProtocol.Field(local,"cameraConnected")=="True"},
    {"cloudConnected",connected && CloudProtocol.Field(local,"cloudConnected")=="True"},
    {"uploading",connected && CloudProtocol.Field(local,"uploading")=="True"},
@@ -249,7 +250,7 @@ static class CHomeCloud {
   SaveLast(seq);SavePending(c);
   string dest=Path.Combine(CloudQueue,c.Seq.ToString("D20")+"_"+c.Id+".cmd");
   string tmp=dest+".part";
-  File.WriteAllText(tmp,J.Serialize(new{id=c.Id,seq=c.Seq,action=c.Action,issuedAt=c.IssuedAt}),Encoding.UTF8);
+  File.WriteAllText(tmp,J.Serialize(new{id=c.Id,seq=c.Seq,action=c.Action,mode=c.Mode,issuedAt=c.IssuedAt}),Encoding.UTF8);
   File.Move(tmp,dest);
   if(c.Action=="START" && !IsRecorderRunning() && File.Exists(DesktopExe)){
    try{Process.Start(new ProcessStartInfo(DesktopExe){UseShellExecute=true});}catch{}

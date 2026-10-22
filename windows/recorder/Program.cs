@@ -105,7 +105,7 @@ internal sealed partial class CamForm : Form {
   ffmpeg=Path.Combine(bin,"ffmpeg.exe");
   recordRoot=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"USBHomeCam");
   Directory.CreateDirectory(data); Directory.CreateDirectory(bin);Directory.CreateDirectory(logs);Directory.CreateDirectory(Path.GetDirectoryName(config));
-  ReadSettings();InitRemoteControl();
+  ReadSettings();InitRemoteControl();LoadRecordingMode();
   Text="USB HomeCam NAVER | USB 카메라 실시간 녹화 + 네이버 MYBOX 백업";
   Font=new Font("Malgun Gothic",9F); Size=new Size(860,715);MinimumSize=new Size(720,610);
   StartPosition=FormStartPosition.CenterScreen;
@@ -170,7 +170,7 @@ internal sealed partial class CamForm : Form {
   autoStart.Checked=HasStartup();autoStart.CheckedChanged+=delegate{if(!settingStartup) SetStartup(autoStart.Checked);};
   settingsPanel.Controls.Add(autoStart);
   var note=new Label {Text="로컬 영상 자동 삭제 안 함 · 10초 TS 조각 · 클라우드 HTTP 업로드 완료 확인",Width=470,Height=27,TextAlign=ContentAlignment.MiddleLeft,ForeColor=Color.FromArgb(89,106,125)};
-  settingsPanel.Controls.Add(note);SetupMotionUI(tools,settingsPanel);panel.Controls.Add(settingsPanel,0,4);
+  settingsPanel.Controls.Add(note);SetupMotionUI(tools,settingsPanel);SetupRecordingModeUI(tools);panel.Controls.Add(settingsPanel,0,4);
   var logPanel=new Panel{Dock=DockStyle.Fill,BackColor=Color.White,Padding=new Padding(10)};
   var label=new Label{Text="상세 작업 로그 (인증 토큰·비밀번호는 표시하지 않음)",Dock=DockStyle.Top,Height=24,ForeColor=Color.FromArgb(30,54,81)};
   logBox=new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,ForeColor=Color.FromArgb(29,50,70),Font=new Font("Consolas",9F),WordWrap=false};
@@ -313,7 +313,7 @@ internal sealed partial class CamForm : Form {
  void StartCapture(){
   if(!recording || capture!=null&&!capture.HasExited)return;
   var day=DateTime.Now.ToString("yyyy-MM-dd");
-  var dir=Path.Combine(recordRoot,"raw",day);Directory.CreateDirectory(dir);
+  var dir=Path.Combine(recordRoot,motionOnly?"raw-motion":"raw",day);Directory.CreateDirectory(dir);
   string file=Path.Combine(dir,"%Y-%m-%d_%H-%M-%S.ts");
   string arg="-nostdin -hide_banner -loglevel warning -f dshow -i "+Q("video="+cameraName)+
    " -an -c:v libx264 -preset ultrafast -tune zerolatency -crf 28 -pix_fmt yuv420p "+
@@ -371,7 +371,7 @@ internal sealed partial class CamForm : Form {
   if(!recording && autoRecordPending && !string.IsNullOrEmpty(cameraName) && !OldVersionRunning())StartRecording();
   UpdatePendingCount();
   if(loggedIn && !uploadBusy && (DateTime.Now-lastUploadAttempt).TotalSeconds>=0.5)UploadPass();
-  RemoteTick();MotionRuntimeTick();RefreshLabels();
+  RemoteTick();MotionRuntimeTick();PruneMotionPrebuffer();RefreshLabels();
  }
  static string HexHash(byte[] content,HashAlgorithm hash){
   using(hash){return BitConverter.ToString(hash.ComputeHash(content)).Replace("-","").ToLowerInvariant();}

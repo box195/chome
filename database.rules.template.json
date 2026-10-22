@@ -7,7 +7,7 @@
         ".read": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
         "command": {
           ".write": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
-          ".validate": "newData.hasChildren(['id','seq','action','requester','issuedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val() > 0 && (!data.exists() || newData.child('seq').val() > data.child('seq').val()) && newData.child('action').isString() && (newData.child('action').val() === 'START' || newData.child('action').val() === 'STOP') && newData.child('requester').val() === auth.uid && newData.child('issuedAt').isNumber() && newData.child('issuedAt').val() >= now - 90000 && newData.child('issuedAt').val() <= now + 15000 && newData.child('seq').val() >= now - 90000 && newData.child('seq').val() <= now + 15000",
+          ".validate": "newData.hasChildren(['id','seq','action','requester','issuedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val() > 0 && (!data.exists() || newData.child('seq').val() > data.child('seq').val()) && newData.child('action').isString() && (newData.child('action').val() === 'START' || newData.child('action').val() === 'STOP') && newData.child('requester').val() === auth.uid && newData.child('issuedAt').isNumber() && newData.child('issuedAt').val() >= now - 90000 && newData.child('issuedAt').val() <= now + 15000 && newData.child('seq').val() >= now - 90000 && newData.child('seq').val() <= now + 15000 && (!newData.hasChild('mode') || (newData.child('mode').isString() && (newData.child('mode').val() === 'MOTION' || newData.child('mode').val() === 'CONTINUOUS' || (newData.child('mode').val() === '' && newData.child('action').val() === 'STOP'))))",
           "$other": {
             ".validate": false
           },
@@ -25,6 +25,9 @@
           },
           "seq": {
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() >= now - 90000 && newData.val() <= now + 15000"
+          },
+          "mode": {
+            ".validate": "newData.isString() && (newData.val() === 'MOTION' || newData.val() === 'CONTINUOUS' || newData.val() === '')"
           }
         },
         "status": {
@@ -74,6 +77,9 @@
           },
           "$other": {
             ".validate": "false"
+          },
+          "mode": {
+            ".validate": "newData.isString() && (newData.val() === 'MOTION' || newData.val() === 'CONTINUOUS' || newData.val() === 'OFF')"
           }
         },
         "ack": {
@@ -127,7 +133,8 @@
               "$other": {
                 ".validate": false
               }
-            }
+            },
+            ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()"
           },
           "testRequests": {
             "$id": {
@@ -189,6 +196,114 @@
           },
           "$other": {
             ".validate": false
+          }
+        },
+        "devices": {
+          "y700": {
+            "authUid": {
+              ".write": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+              ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{15,128}$/)",
+              ".read": "auth != null && $uid === '__OWNER_UID__' && auth.uid === data.val()"
+            },
+            "command": {
+              ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients/'+$uid+'/devices/y700/authUid').val()",
+              ".write": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+              ".validate": "newData.hasChildren(['id','seq','action','mode','requester','issuedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val()>0 && (!data.exists() || newData.child('seq').val()>data.child('seq').val()) && newData.child('requester').val()===auth.uid && (newData.child('action').val()==='START' || newData.child('action').val()==='STOP') && (newData.child('mode').val()==='MOTION' || newData.child('mode').val()==='CONTINUOUS') && newData.child('issuedAt').isNumber() && newData.child('issuedAt').val()>=now-90000 && newData.child('issuedAt').val()<=now+15000 && newData.child('seq').val()>=now-90000 && newData.child('seq').val()<=now+15000"
+            },
+            "status": {
+              ".write": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients/'+$uid+'/devices/y700/authUid').val()",
+              ".validate": "newData.hasChildren(['bridgeAt','monitoring','cameraConnected','recording','mode','motionDetections','pendingUploads','localClips','uploadedClips','cloudConnected']) && newData.child('bridgeAt').isNumber() && newData.child('bridgeAt').val()>=now-90000 && newData.child('bridgeAt').val()<=now+15000 && newData.child('monitoring').isBoolean() && newData.child('cameraConnected').isBoolean() && newData.child('recording').isBoolean() && (newData.child('mode').val()==='OFF' || newData.child('mode').val()==='MOTION' || newData.child('mode').val()==='CONTINUOUS') && newData.child('motionDetections').isNumber() && newData.child('motionDetections').val()>=0 && newData.child('pendingUploads').isNumber() && newData.child('pendingUploads').val()>=0 && newData.child('localClips').isNumber() && newData.child('localClips').val()>=0 && newData.child('uploadedClips').isNumber() && newData.child('uploadedClips').val()>=0 && newData.child('cloudConnected').isBoolean()"
+            },
+            "ack": {
+              ".write": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients/'+$uid+'/devices/y700/authUid').val()",
+              ".validate": "newData.hasChildren(['id','seq','action','phase','detail','updatedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val()>0 && (newData.child('action').val()==='START' || newData.child('action').val()==='STOP') && (newData.child('phase').val()==='queued' || newData.child('phase').val()==='applied' || newData.child('phase').val()==='failed') && newData.child('detail').isString() && newData.child('updatedAt').isNumber()"
+            },
+            "pushVapid": {
+              ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()",
+              ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+              ".validate": "newData.hasChildren(['subject','publicKey','privateKey'])",
+              "subject": {
+                ".validate": "newData.isString() && newData.val().length <= 200 && newData.val().beginsWith('https://')"
+              },
+              "publicKey": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{87}=?$/)"
+              },
+              "privateKey": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{43}=?$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "live": {
+              "offer": {
+                ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+                ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+                "id": {
+                  ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+                },
+                "sdp": {
+                  ".validate": "newData.isString() && newData.val().length <= 32768"
+                },
+                "createdAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+                },
+                "$other": {
+                  ".validate": false
+                },
+                ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()"
+              },
+              "answer": {
+                ".write": "(auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com') || (auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val())",
+                ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+                "id": {
+                  ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+                },
+                "sdp": {
+                  ".validate": "newData.isString() && newData.val().length <= 32768"
+                },
+                "createdAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        },
+        "pcLive": {
+          "offer": {
+            ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+            ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+            "id": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+            },
+            "sdp": {
+              ".validate": "newData.isString() && newData.val().length <= 32768"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "answer": {
+            ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+            ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+            "id": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+            },
+            "sdp": {
+              ".validate": "newData.isString() && newData.val().length <= 32768"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }
