@@ -26,10 +26,10 @@ There is no automatic weekday/weekend switching.
 ## Limitations / unfinished validation
 - Not yet validated on physical Y700.
 - No 30-second Android pre-motion recording. Event video begins after motion and continues until 120s after last motion.
-- Web Push background sender currently runs on PC, so PC-off closed-tab tablet motion push notifications are NOT complete.
+- Android motion push sender is implemented using the existing Web Push subscription, with 2-minute cooldown. Physical closed-tab delivery needs verification.
 - No upload deletion/PC archive lifecycle for tablet yet; local files remain after upload.
 - MYBOX Android upload is implemented but not verified against a real account.
-- Android screen-off and power/battery bypass stability require on-device tests.
+- Android screen-off wake locks and WebRTC viewer are implemented; screen-off camera retention and off-network P2P connectivity need physical tests.
 - Debug APK is development-signed only.
 
 ## Security

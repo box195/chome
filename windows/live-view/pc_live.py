@@ -3,6 +3,8 @@ import asyncio
 import glob
 import json
 import os
+import sys
+import msvcrt
 import pathlib
 import subprocess
 import time
@@ -19,7 +21,7 @@ ROOT = "https://chome-a8970-default-rtdb.firebaseio.com"
 API_KEY = "AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo"
 BASE = pathlib.Path(__file__).resolve().parents[1]
 SECRETS_HELPER = BASE / "push-sender" / "ReadPushSecrets.exe"
-VIDEO_FOLDER = pathlib.Path.home() / "Videos" / "USBHomeCam"
+VIDEO_FOLDER = pathlib.Path(os.environ.get("CHOME_VIDEO_ROOT",str(pathlib.Path.home() / "Videos" / "USBHomeCam")))
 
 
 class OwnerAuth:
@@ -131,7 +133,24 @@ async def answer_offer(owner, offer):
 
 
 async def main():
+    lock_path = pathlib.Path(os.environ["LOCALAPPDATA"]) / "USBHomeCamNAVER" / "remote" / "pc-live.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = open(lock_path, "a+b")
+    lock_file.seek(0)
+    if lock_file.read(1) == b"":
+        lock_file.write(b"0")
+        lock_file.flush()
+    try:
+        lock_file.seek(0)
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
+        print("CHOME_PC_LIVE_ALREADY_RUNNING")
+        return
     owner = OwnerAuth()
+    if "--self-test" in sys.argv:
+        await asyncio.to_thread(owner.request, "offer")
+        print("CHOME_PC_LIVE_AUTH_TEST_PASS")
+        return
     last = ""
     peer = None
     print("CHOME_PC_WEBRTC_SIGNALING_ACTIVE")

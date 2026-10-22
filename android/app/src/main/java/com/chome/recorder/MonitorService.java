@@ -145,6 +145,7 @@ public final class MonitorService extends LifecycleService {
     private void analyze(@NonNull ImageProxy frame){
         try{
             long now=SystemClock.elapsedRealtime();
+            if(liveWebRtc!=null)liveWebRtc.frame(frame);
             if(now-lastAnalyzed<450L)return;
             lastAnalyzed=now;
             final int w=frame.getWidth(),h=frame.getHeight();
@@ -161,7 +162,6 @@ public final class MonitorService extends LifecycleService {
                     pixels[y*MotionDetector.W+x]=buf.get(offset+yy*rowStride+xx*pixelStride);
                 }
             }
-            if(liveWebRtc!=null)liveWebRtc.frame(frame);
             boolean found=detector.feed(pixels);
             if(found)main.post(()->onMotion());
         }catch(Exception e){/* A damaged frame must never stop camera analysis. */}

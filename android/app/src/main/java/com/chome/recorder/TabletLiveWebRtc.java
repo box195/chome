@@ -20,6 +20,7 @@ final class TabletLiveWebRtc {
     private PeerConnection peer;
     private VideoSource source;
     private VideoTrack track;
+    private EglBase egl;
     private CapturerObserver observer;
     private ValueEventListener listener;
     private String active="";
@@ -35,7 +36,7 @@ final class TabletLiveWebRtc {
         try{
             PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions
                 .builder(context).createInitializationOptions());
-            EglBase egl=EglBase.create();
+            egl=EglBase.create();
             factory=PeerConnectionFactory.builder()
                 .setVideoEncoderFactory(new DefaultVideoEncoderFactory(egl.getEglBaseContext(),true,true))
                 .setVideoDecoderFactory(new DefaultVideoDecoderFactory(egl.getEglBaseContext()))
@@ -163,6 +164,7 @@ final class TabletLiveWebRtc {
             if(track!=null)track.dispose();
             if(source!=null)source.dispose();
             if(factory!=null)factory.dispose();
+            if(egl!=null)egl.release();
         }
     }
     static class EmptySdp implements SdpObserver {

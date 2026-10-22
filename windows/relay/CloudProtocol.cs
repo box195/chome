@@ -71,7 +71,15 @@ internal static class CloudProtocol {
   state["recording"]=false;check(!ResultApplied(cmd,receipt,state,now),"not recording");
   state["recording"]=true;check(!ResultApplied(cmd,receipt,state,now+20000),"stale recorder");
   receipt["seq"]=now+1;check(!ResultApplied(cmd,receipt,state,now),"mismatched receipt");
-  Console.WriteLine("CLOUD_PROTOCOL_TESTS_PASS="+n);
+  x["mode"]="INVALID";
+  check(!Parse(x,"owner01",now-1,now,out cmd,out why),"reject invalid mode");
+  x["mode"]="MOTION";
+  check(Parse(x,"owner01",now-1,now,out cmd,out why) && cmd.Mode=="MOTION","accept motion mode");
+  receipt["seq"]=now;
+  state["mode"]="CONTINUOUS";
+  check(!ResultApplied(cmd,receipt,state,now),"reject incorrect recorder mode");
+  state["mode"]="MOTION";
+  check(ResultApplied(cmd,receipt,state,now),"confirm requested motion mode");  Console.WriteLine("CLOUD_PROTOCOL_TESTS_PASS="+n);
   return 0;
  }
 }
