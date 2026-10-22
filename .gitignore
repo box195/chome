@@ -1,4 +1,4 @@
-﻿*.exe
+*.exe
 *.dll
 *.pdb
 *.log
@@ -30,3 +30,7 @@ database.rules.owner.json
 *.exe
 owner-uid.txt
 pair-code.txt
+
+windows/live-view/.venv/
+**/__pycache__/
+*.pyc

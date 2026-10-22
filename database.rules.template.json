@@ -7,7 +7,7 @@
         ".read": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
         "command": {
           ".write": "auth != null && auth.uid === '__OWNER_UID__' && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
-          ".validate": "newData.hasChildren(['id','seq','action','requester','issuedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val() > 0 && (!data.exists() || newData.child('seq').val() > data.child('seq').val()) && newData.child('action').isString() && (newData.child('action').val() === 'START' || newData.child('action').val() === 'STOP') && newData.child('requester').val() === auth.uid && newData.child('issuedAt').isNumber() && newData.child('issuedAt').val() >= now - 90000 && newData.child('issuedAt').val() <= now + 15000 && newData.child('seq').val() >= now - 90000 && newData.child('seq').val() <= now + 15000",
+          ".validate": "newData.hasChildren(['id','seq','action','requester','issuedAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('seq').isNumber() && newData.child('seq').val() > 0 && (!data.exists() || newData.child('seq').val() > data.child('seq').val()) && newData.child('action').isString() && (newData.child('action').val() === 'START' || newData.child('action').val() === 'STOP') && newData.child('requester').val() === auth.uid && newData.child('issuedAt').isNumber() && newData.child('issuedAt').val() >= now - 90000 && newData.child('issuedAt').val() <= now + 15000 && newData.child('seq').val() >= now - 90000 && newData.child('seq').val() <= now + 15000 && (!newData.hasChild('mode') || (newData.child('mode').isString() && (newData.child('mode').val() === 'MOTION' || newData.child('mode').val() === 'CONTINUOUS' || (newData.child('mode').val() === '' && newData.child('action').val() === 'STOP'))))",
           "$other": {
             ".validate": false
           },
@@ -25,6 +25,9 @@
           },
           "seq": {
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() >= now - 90000 && newData.val() <= now + 15000"
+          },
+          "mode": {
+            ".validate": "newData.isString() && (newData.val() === 'MOTION' || newData.val() === 'CONTINUOUS' || newData.val() === '')"
           }
         },
         "status": {
@@ -74,6 +77,9 @@
           },
           "$other": {
             ".validate": "false"
+          },
+          "mode": {
+            ".validate": "newData.isString() && (newData.val() === 'MOTION' || newData.val() === 'CONTINUOUS' || newData.val() === 'OFF')"
           }
         },
         "ack": {
@@ -228,6 +234,75 @@
               "$other": {
                 ".validate": false
               }
+            },
+            "live": {
+              "offer": {
+                ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+                ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+                "id": {
+                  ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+                },
+                "sdp": {
+                  ".validate": "newData.isString() && newData.val().length <= 32768"
+                },
+                "createdAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+                },
+                "$other": {
+                  ".validate": false
+                },
+                ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()"
+              },
+              "answer": {
+                ".write": "(auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com') || (auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val())",
+                ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+                "id": {
+                  ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+                },
+                "sdp": {
+                  ".validate": "newData.isString() && newData.val().length <= 32768"
+                },
+                "createdAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        },
+        "pcLive": {
+          "offer": {
+            ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+            ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+            "id": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+            },
+            "sdp": {
+              ".validate": "newData.isString() && newData.val().length <= 32768"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "answer": {
+            ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+            ".validate": "newData.hasChildren(['id','sdp','createdAt']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('sdp').isString() && newData.child('sdp').val().length <= 32768 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 60000 && newData.child('createdAt').val() <= now + 15000",
+            "id": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+            },
+            "sdp": {
+              ".validate": "newData.isString() && newData.val().length <= 32768"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 15000"
+            },
+            "$other": {
+              ".validate": false
             }
           }
         }

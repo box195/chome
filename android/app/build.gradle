@@ -25,4 +25,5 @@ dependencies {
     implementation 'com.google.firebase:firebase-database:21.0.0'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'androidx.work:work-runtime:2.10.2'
+    implementation 'io.github.webrtc-sdk:android:150.7871.01'
 }

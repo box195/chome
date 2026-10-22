@@ -52,6 +52,7 @@ internal sealed partial class CamForm {
      updatedAt=DateTime.UtcNow.ToString("o"),
      running=true,
      recording=recording,
+     mode=motionOnly?"MOTION":"CONTINUOUS",
      cameraConnected=!string.IsNullOrEmpty(cameraName),
      cloudConnected=loggedIn,
      uploading=uploadBusy,
@@ -90,6 +91,8 @@ internal sealed partial class CamForm {
    try{
     var d=new JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,object>>(File.ReadAllText(f,Encoding.UTF8));
     id=Convert.ToString(d["id"]);action=Convert.ToString(d["action"]);seq=Convert.ToInt64(d["seq"]);issued=Convert.ToInt64(d["issuedAt"]);
+    string requestedMode=d.ContainsKey("mode")?Convert.ToString(d["mode"]):"";
+    if(requestedMode!=""&&requestedMode!="MOTION"&&requestedMode!="CONTINUOUS"){File.Delete(f);continue;}
     if(!System.Text.RegularExpressions.Regex.IsMatch(id??"","^[a-f0-9]{32}$") ||
        seq<=0 || (action!="START"&&action!="STOP")){File.Delete(f);continue;}
     string receipt=Path.Combine(results,id+".json");
@@ -99,6 +102,7 @@ internal sealed partial class CamForm {
      long now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
      if(issued<now-90000 || issued>now+15000)throw new InvalidOperationException("expired_command");
      if(action=="START"){
+      if(requestedMode=="MOTION"||requestedMode=="CONTINUOUS")SetRecordingMode(requestedMode=="MOTION");
       remoteControlStopped=false;PersistRemoteDesired("START");
       if(!recording){autoRecordPending=true;if(!string.IsNullOrEmpty(cameraName))StartRecording();else if(!scanning)ScanCameras();}
      }else{

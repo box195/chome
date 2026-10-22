@@ -30,7 +30,7 @@ footer{text-align:center;color:#8d9bb0;font-size:.8rem;padding:22px}
 <div id="dashboard" class="hidden">
 <section class="panel">
 <h2 id="status">PC 상태 확인 중</h2><p id="updated" class="notice">연결 확인 중</p>
-<div class="buttons"><button id="start" class="blue" disabled>녹화 시작</button><button id="stop" class="red" disabled>녹화 중지</button></div>
+<label for="pcMode">PC 녹화 방식</label><select id="pcMode"><option value="MOTION">움직임 감지 시에만 저장</option><option value="CONTINUOUS">상시 녹화</option></select><div class="buttons"><button id="start" class="blue" disabled>녹화 시작</button><button id="stop" class="red" disabled>녹화 중지</button></div>
 <p id="feedback" class="notice" role="status">명령 처리 대기</p>
 </section>
 <section class="panel">

@@ -32,6 +32,7 @@ public final class MonitorService extends LifecycleService {
     private PowerManager.WakeLock cpuLock;
     private WifiManager.WifiLock wifiLock;
     private TabletPushSender pushSender;
+    private TabletLiveWebRtc liveWebRtc;
     private ProcessCameraProvider provider;
     private VideoCapture<Recorder> video;
     private Recording recording;
@@ -160,6 +161,7 @@ public final class MonitorService extends LifecycleService {
                     pixels[y*MotionDetector.W+x]=buf.get(offset+yy*rowStride+xx*pixelStride);
                 }
             }
+            if(liveWebRtc!=null)liveWebRtc.frame(frame);
             boolean found=detector.feed(pixels);
             if(found)main.post(()->onMotion());
         }catch(Exception e){/* A damaged frame must never stop camera analysis. */}
@@ -218,6 +220,7 @@ public final class MonitorService extends LifecycleService {
                     setLocalState("Firebase 기기 승인 확인 완료 / 명령 연결 중");
                     attachFirebase();
                     if(pushSender==null)pushSender=new TabletPushSender(MonitorService.this,ownerUid);
+                    if(liveWebRtc==null){liveWebRtc=new TabletLiveWebRtc(MonitorService.this,ownerUid);liveWebRtc.start();}
                     publishState();
                 }
                 @Override public void onCancelled(@NonNull DatabaseError error) {
@@ -295,6 +298,7 @@ public final class MonitorService extends LifecycleService {
             deviceRef.child("status").updateChildren(offline);}
         try{if(provider!=null)provider.unbindAll();}catch(Exception e){}
         if(pushSender!=null)pushSender.close();
+        if(liveWebRtc!=null)liveWebRtc.stop();
         if(wifiLock!=null && wifiLock.isHeld())wifiLock.release();
         if(cpuLock!=null && cpuLock.isHeld())cpuLock.release();
         analyzer.shutdownNow();setLocalState("감시 서비스 종료");

@@ -7,6 +7,7 @@ internal sealed class CloudCommand {
  public long Seq;
  public string Id;
  public string Action;
+ public string Mode;
  public long IssuedAt;
 }
 
@@ -29,7 +30,9 @@ internal static class CloudProtocol {
   if(!IdFormat.IsMatch(id) || (action!="START" && action!="STOP") || requester!=uid)return false;
   if(!long.TryParse(Field(data,"issuedAt"),NumberStyles.Integer,CultureInfo.InvariantCulture,out issued))return false;
   if(issued>now+FutureSkewMs || issued<now-MaxAgeMs){reason="stale";return false;}
-  cmd=new CloudCommand{Seq=seq,Id=id,Action=action,IssuedAt=issued};
+  string mode=Field(data,"mode");
+  if(mode!="" && mode!="MOTION" && mode!="CONTINUOUS")return false;
+  cmd=new CloudCommand{Seq=seq,Id=id,Action=action,Mode=mode,IssuedAt=issued};
   reason="ok";return true;
  }
  internal static bool MatchesReceipt(Dictionary<string,object> data,CloudCommand pending) {
@@ -46,7 +49,8 @@ internal static class CloudProtocol {
  }
  internal static bool ResultApplied(CloudCommand pending,Dictionary<string,object> receipt,Dictionary<string,object> state,long now){
   if(!MatchesReceipt(receipt,pending) || !RecentState(state,now))return false;
-  return Field(state,"recording").ToLowerInvariant()==(pending.Action=="START"?"true":"false");
+  return Field(state,"recording").ToLowerInvariant()==(pending.Action=="START"?"true":"false") &&
+    (pending.Action!="START" || string.IsNullOrEmpty(pending.Mode) || Field(state,"mode")==pending.Mode);
  }
  internal static int RunTests(){
   int n=0;Action<bool,string> check=(b,msg)=>{if(!b)throw new Exception("FAIL "+msg);n++;};

@@ -91,13 +91,14 @@ internal sealed partial class CamForm {
    string eventId=at.ToString("yyyyMMdd_HHmmss")+(test?"_TEST":"");
    motionFolder=Path.Combine(recordRoot,"events",at.ToString("yyyy-MM-dd"),eventId);
    Directory.CreateDirectory(motionFolder);
+   if(motionOnly)File.WriteAllText(Path.Combine(motionFolder,"upload-event.marker"),"motion-only");
    motionEventClips=0;
    File.WriteAllText(Path.Combine(motionFolder,"event-info.txt"),
       "Event start="+at.ToString("o")+"\r\nBefore=30s\r\nAfter last motion=120s\r\nAlert cooldown=1s\r\n"+
       "Sensitivity=High\r\nPerson-only=False\r\nManualTest="+test+"\r\n"+
       "Source video remains in raw folder and is uploaded independently to MYBOX.\r\n",Encoding.UTF8);
    var baseline=at.AddSeconds(-30);
-   string raw=Path.Combine(recordRoot,"raw");
+   string raw=Path.Combine(recordRoot,motionOnly?"raw-motion":"raw");
    var candidates=Directory.GetFiles(raw,"*.ts",SearchOption.AllDirectories)
      .Select(s=>new FileInfo(s))
      .Where(f=>f.LastWriteTime>=baseline&&f.LastWriteTime<=at.AddSeconds(2)&&f.Length>1000)
@@ -142,6 +143,7 @@ internal sealed partial class CamForm {
    if(!File.Exists(output)){
     CloudBundler.Pack(ffmpeg,clips,output);
     if(new FileInfo(output).Length<1000)throw new IOException("Empty merged event clip");
+    if(File.Exists(Path.Combine(folder,"upload-event.marker")))QueueFresh(output);
     Log("이벤트 통합 영상 완성: "+output+" ("+clips.Count+"개 구간, 1초 원본 유지)");
    }
   }catch(Exception ex){Log("이벤트 통합 실패, 1초 원본 보존: "+Limit(ex.Message,140));}
