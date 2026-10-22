@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 public final class MyboxUploadWorker extends Worker {
+    private static final Object UPLOAD_MUTEX=new Object();
     public MyboxUploadWorker(@NonNull Context context,@NonNull WorkerParameters params) {
         super(context,params);
     }
@@ -38,7 +39,8 @@ public final class MyboxUploadWorker extends Worker {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,1,TimeUnit.MINUTES).build();
         WorkManager.getInstance(c).enqueueUniqueWork("mybox-motion-1s-queue",
             ExistingWorkPolicy.APPEND_OR_REPLACE,request);
-    }    @NonNull @Override public Result doWork() {
+    }
+    @NonNull @Override public Result doWork() {
         String pat=Settings.token(getApplicationContext());
         if(pat.isEmpty())return Result.success(); // No secrets configured yet: do not leak or delete local clips.
         File folder=videoFolder(getApplicationContext());
@@ -48,22 +50,27 @@ public final class MyboxUploadWorker extends Worker {
                 return Result.failure();
             File file=new File(folder,single);
             try{
-                if(!file.isFile())return Result.success();
-                if(new File(file.getAbsolutePath()+".uploaded").exists())return Result.success();
-                uploadOne(file,pat,Settings.publicPrefs(getApplicationContext()).getString(Settings.KEY_FOLDER,""));
-                markComplete(file);
+                synchronized(UPLOAD_MUTEX){
+                    if(!file.isFile())return Result.success();
+                    if(new File(file.getAbsolutePath()+".uploaded").exists())return Result.success();
+                    uploadOne(file,pat,Settings.publicPrefs(getApplicationContext()).getString(Settings.KEY_FOLDER,""));
+                    markComplete(file);
+                }
                 return Result.success();
             }catch(Exception e){return Result.retry();}
-        }        File[] files=folder.listFiles((f,n)->n.endsWith(".mp4"));
+        }
+        File[] files=folder.listFiles((f,n)->n.endsWith(".mp4"));
         if(files==null)return Result.success();
         java.util.Arrays.sort(files,(a,b)->Long.compare(a.lastModified(),b.lastModified()));
         int done=0;
         try{
             for(File file:files){
                 if(isStopped())return Result.retry();
-                if(new File(file.getAbsolutePath()+".uploaded").exists())continue;
-                uploadOne(file,pat,Settings.publicPrefs(getApplicationContext()).getString(Settings.KEY_FOLDER,""));
-                markComplete(file);
+                synchronized(UPLOAD_MUTEX){
+                    if(new File(file.getAbsolutePath()+".uploaded").exists())continue;
+                    uploadOne(file,pat,Settings.publicPrefs(getApplicationContext()).getString(Settings.KEY_FOLDER,""));
+                    markComplete(file);
+                }
                 if(++done>=20)return Result.retry();
             }
             return Result.success();
@@ -78,7 +85,8 @@ public final class MyboxUploadWorker extends Worker {
             out.write("verified_response\n".getBytes(StandardCharsets.UTF_8));
             out.getFD().sync();
         }
-    }    private void uploadOne(File f,String pat,String parent) throws Exception {
+    }
+    private void uploadOne(File f,String pat,String parent) throws Exception {
         JSONObject body=new JSONObject();
         body.put("fileName","Y700_"+f.getName());
         body.put("fileSize",f.length());
