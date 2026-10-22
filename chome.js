@@ -1,5 +1,6 @@
 import {createTabletUI} from "./tablet-ui.js";
 import {makeLiveView} from "./live-view.js";
+import {createDeviceDashboard} from "./device-dashboard.js";
 import {makePushUI} from "./push-client.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
@@ -11,6 +12,7 @@ const liveUI=makeLiveView({db,ref,set,remove,onValue,$,getPcState:()=>state});
 const pushUI=makePushUI({auth,db,ref,set,onValue,remove,$,text:(id,msg)=>$(id).textContent=String(msg)});
 let pcModeInitialized=false;
 let user=null,stopState=null,stopAck=null,state=null,ack=null,lastCount=null,sequence=0,pending=null;
+const deviceDashboard=createDeviceDashboard({tabletUI,getPcState:()=>state,pcBridgeAlive:bridgeAlive});
 const text=(id,value)=>$(id).textContent=String(value);
 const pretty=value=>{
  if(!value)return "없음";
@@ -27,7 +29,7 @@ function bridgeAlive(){
 }
 function redraw(){
  const bridge=bridgeAlive(),online=bridge&&state?.online===true;
- text("badge",!bridge?"PC 연결 대기":online?"PC 녹화기 온라인":"PC 릴레이 온라인 · 녹화기 꺼짐");
+ text("badge",user?"CHome 로그인됨":"로그인 필요");
  text("status",!bridge?"PC 릴레이 연결 대기":
   online?(state.mode==="MOTION"?(state.motionActive?"PC 움직임 감지 녹화 중":"PC 움직임 감시 중 · 평소 미녹화"):
   state.recording?"PC 상시 녹화 중":"PC 대기 중"):"PC 릴레이 연결됨 · 녹화기 미실행");

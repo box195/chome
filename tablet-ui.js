@@ -67,7 +67,7 @@ export function createTabletUI({db,ref,onValue,set,remove,$}) {
     catch(e){message("tabletPairFeedback","해제 실패: "+(e.code||e.message));}
   };
   setInterval(render,3000);
-  return {setUser(next){
+  return {getSnapshot(){return {status,configuredUid,online:online()};},setUser(next){
     cleanup();user=next||null;
     if(!user){render();return;}
     const root=devicePath();
