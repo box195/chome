@@ -275,6 +275,55 @@
               "state": {
                 ".write": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()",
                 ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "offerCandidates": {
+                "$session": {
+                  "$candidate": {
+                    ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+                    ".validate": "$session.matches(/^[a-f0-9]{32}$/) && $candidate.matches(/^[a-f0-9]{32}$/) && newData.hasChildren(['candidate','sdpMid','sdpMLineIndex','createdAt']) && newData.child('candidate').isString() && newData.child('candidate').val().length <= 2000 && newData.child('sdpMid').isString() && newData.child('sdpMid').val().length <= 40 && newData.child('sdpMLineIndex').isNumber() && newData.child('sdpMLineIndex').val() >= 0 && newData.child('sdpMLineIndex').val() <= 10 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 90000 && newData.child('createdAt').val() <= now + 15000",
+                    "candidate": {
+                      ".validate": "newData.isString() && newData.val().length <= 2000"
+                    },
+                    "sdpMid": {
+                      ".validate": "newData.isString() && newData.val().length <= 40"
+                    },
+                    "sdpMLineIndex": {
+                      ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+                    },
+                    "createdAt": {
+                      ".validate": "newData.isNumber() && newData.val() >= now - 90000 && newData.val() <= now + 15000"
+                    },
+                    "$other": {
+                      ".validate": false
+                    }
+                  },
+                  ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'"
+                },
+                ".read": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()"
+              },
+              "answerCandidates": {
+                "$session": {
+                  "$candidate": {
+                    ".write": "auth != null && $uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'anonymous' && auth.uid === root.child('clients').child($uid).child('devices').child('y700').child('authUid').val()",
+                    ".validate": "$session.matches(/^[a-f0-9]{32}$/) && $candidate.matches(/^[a-f0-9]{32}$/) && newData.hasChildren(['candidate','sdpMid','sdpMLineIndex','createdAt']) && newData.child('candidate').isString() && newData.child('candidate').val().length <= 2000 && newData.child('sdpMid').isString() && newData.child('sdpMid').val().length <= 40 && newData.child('sdpMLineIndex').isNumber() && newData.child('sdpMLineIndex').val() >= 0 && newData.child('sdpMLineIndex').val() <= 10 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 90000 && newData.child('createdAt').val() <= now + 15000",
+                    "candidate": {
+                      ".validate": "newData.isString() && newData.val().length <= 2000"
+                    },
+                    "sdpMid": {
+                      ".validate": "newData.isString() && newData.val().length <= 40"
+                    },
+                    "sdpMLineIndex": {
+                      ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+                    },
+                    "createdAt": {
+                      ".validate": "newData.isNumber() && newData.val() >= now - 90000 && newData.val() <= now + 15000"
+                    },
+                    "$other": {
+                      ".validate": false
+                    }
+                  },
+                  ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'"
+                }
               }
             }
           }
@@ -310,6 +359,30 @@
             },
             "$other": {
               ".validate": false
+            }
+          },
+          "offerCandidates": {
+            "$session": {
+              "$candidate": {
+                ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'",
+                ".validate": "$session.matches(/^[a-f0-9]{32}$/) && $candidate.matches(/^[a-f0-9]{32}$/) && newData.hasChildren(['candidate','sdpMid','sdpMLineIndex','createdAt']) && newData.child('candidate').isString() && newData.child('candidate').val().length <= 2000 && newData.child('sdpMid').isString() && newData.child('sdpMid').val().length <= 40 && newData.child('sdpMLineIndex').isNumber() && newData.child('sdpMLineIndex').val() >= 0 && newData.child('sdpMLineIndex').val() <= 10 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 90000 && newData.child('createdAt').val() <= now + 15000",
+                "candidate": {
+                  ".validate": "newData.isString() && newData.val().length <= 2000"
+                },
+                "sdpMid": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
+                "sdpMLineIndex": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+                },
+                "createdAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 90000 && newData.val() <= now + 15000"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
+              ".write": "auth != null && $uid === '__OWNER_UID__' && auth.uid === '__OWNER_UID__' && auth.token.firebase.sign_in_provider === 'google.com'"
             }
           }
         }

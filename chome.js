@@ -27,20 +27,20 @@ function bridgeAlive(){
 }
 function redraw(){
  const bridge=bridgeAlive(),online=bridge&&state?.online===true;
- text("badge",!bridge?"연결 끊김":online?"PC 온라인":"PC 릴레이 온라인");
- text("status",!bridge?"PC 연결 대기":
+ text("badge",!bridge?"PC 연결 대기":online?"PC 녹화기 온라인":"PC 릴레이 온라인 · 녹화기 꺼짐");
+ text("status",!bridge?"PC 릴레이 연결 대기":
   online?(state.mode==="MOTION"?(state.motionActive?"PC 움직임 감지 녹화 중":"PC 움직임 감시 중 · 평소 미녹화"):
-  (state.recording?"PC 상시 녹화 중":"PC 대기 중")):"PC 릴레이 연결됨 · 녹화기 꺼짐");
- text("updated",bridge?"최근 녹화기 상태: "+pretty(state?.updatedAt):"Firebase 상태가 오래되었습니다. PC 릴레이를 확인하세요.");
- text("camera",online?(state.cameraConnected?"연결됨":"미연결"):"-");
- text("cloud",online?(state.cloudConnected?"연결됨":"로그인 안 됨"):"-");
- text("pending",online?String(state.pendingUploads??0)+"건":"-");
- text("motion",online?(state.motionActive?"이벤트 녹화 중":"대기 중"):"-");
+  state.recording?"PC 상시 녹화 중":"PC 대기 중"):"PC 릴레이 연결됨 · 녹화기 미실행");
+ text("updated",bridge?"PC 최근 상태: "+pretty(state?.updatedAt):"PC 릴레이의 최근 상태가 오래됐습니다.");
+ text("camera",!bridge?"-":!online?"녹화기 미실행":state.cameraConnected?"연결됨":"미연결");
+ text("cloud",!bridge?"-":!online?"녹화기 미실행":state.cloudConnected?"연결됨":"로그인 필요");
+ text("pending",!bridge?"-":!online?"녹화기 미실행":String(state.pendingUploads??0)+"개");
+ text("motion",!bridge?"-":!online?"감시 중단":state.motionActive?"이벤트 녹화 중":"대기");
  text("lastMotion","최근 움직임 감지: "+pretty(state?.lastMotion));
- text("pcMotionCount",online?String(state.motionDetections??0):"-");
- text("pcRecordingMode",!online?"꺼짐":state.mode==="MOTION"?
-  (state.motionActive?"움직임 감지 후 녹화 중":"움직임 감시 중 (평소 미녹화)"):
-  state.mode==="CONTINUOUS"?"상시 녹화":"대기");
+ text("pcMotionCount",state&&Number.isFinite(Number(state.motionDetections))?String(state.motionDetections):"-");
+ text("pcRecordingMode",!bridge?"PC 연결 끊김":!online?"녹화기 미실행":
+   state.mode==="MOTION"?(state.motionActive?"움직임 이벤트 녹화 중":"움직임 감시 중 (평소 미녹화)"):
+   state.mode==="CONTINUOUS"?"상시 녹화":"대기");
  $("start").disabled=!user||!bridge||Boolean(pending);
  $("stop").disabled=!user||!bridge||Boolean(pending);
  const count=Number(state?.motionDetections||0);
@@ -48,7 +48,6 @@ function redraw(){
  if(!pcModeInitialized&&(mode==="MOTION"||mode==="CONTINUOUS")){
    $("pcMode").value=mode;pcModeInitialized=true;
  }
-
 }
 function handleAck(value){
  ack=value;

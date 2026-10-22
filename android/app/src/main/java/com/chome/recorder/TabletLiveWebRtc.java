@@ -13,7 +13,7 @@ import java.util.*;
 /** Firebase carries signaling only. The existing CameraX analyzer supplies video. */
 final class TabletLiveWebRtc {
     private final Context context;
-    private final DatabaseReference offer,answer,diagnostics;
+    private final DatabaseReference offer,answer,diagnostics,offerCandidates,answerCandidates;
     private volatile String liveState="starting";
     private final Handler main=new Handler(Looper.getMainLooper());
     private final Object gate=new Object();
@@ -24,6 +24,8 @@ final class TabletLiveWebRtc {
     private EglBase egl;
     private CapturerObserver observer;
     private ValueEventListener listener;
+    private ChildEventListener remoteIceListener;
+    private String remoteIceSession="";
     private String active="";
     private long lastFrame;
     private boolean closed;
@@ -32,6 +34,7 @@ final class TabletLiveWebRtc {
         DatabaseReference base=FirebaseDatabase.getInstance().getReference(
             "clients/"+owner+"/devices/y700/live");
         offer=base.child("offer");answer=base.child("answer");diagnostics=base.child("state");
+        offerCandidates=base.child("offerCandidates");answerCandidates=base.child("answerCandidates");
     }
     void start(){
         try{
@@ -111,7 +114,22 @@ final class TabletLiveWebRtc {
                 @Override public void onIceGatheringChange(PeerConnection.IceGatheringState s){
                     if(s==PeerConnection.IceGatheringState.COMPLETE)writeAnswer(id);
                 }
-                @Override public void onIceCandidate(IceCandidate candidate){}
+                @Override public void onIceCandidate(IceCandidate candidate){
+                    if(candidate==null||closed)return;
+                    synchronized(gate){
+                        if(!id.equals(active)||peer==null)return;
+                        String text=candidate.sdp;
+                        if(text==null||text.length()>2000)return;
+                        Map<String,Object> packet=new HashMap<>();
+                        packet.put("candidate",text);
+                        packet.put("sdpMid",candidate.sdpMid==null?"0":candidate.sdpMid);
+                        packet.put("sdpMLineIndex",candidate.sdpMLineIndex);
+                        packet.put("createdAt",System.currentTimeMillis());
+                        String key=java.util.UUID.randomUUID().toString().replace("-","");
+                        answerCandidates.child(id).child(key).setValue(packet,
+                            (error,reference)->{if(error!=null)updateState("answer_ice_write_failed");});
+                    }
+                }
                 @Override public void onIceCandidatesRemoved(IceCandidate[] candidates){}
                 @Override public void onAddStream(MediaStream stream){}
                 @Override public void onRemoveStream(MediaStream stream){}
@@ -125,6 +143,7 @@ final class TabletLiveWebRtc {
                     synchronized(gate){
                         if(peer==null||!active.equals(id))return;
                         peer.addTrack(track,Collections.singletonList("CHome"));
+                        watchRemoteIce(id);
                         updateState("remote_offer_accepted");
                         peer.createAnswer(new SdpObserver(){
                             @Override public void onCreateSuccess(SessionDescription local){
@@ -134,8 +153,7 @@ final class TabletLiveWebRtc {
                                         @Override public void onSetSuccess(){
                                             updateState("local_answer_ready");
                                             synchronized(gate){
-                                                if(peer!=null&&peer.iceGatheringState()==PeerConnection.IceGatheringState.COMPLETE)
-                                                    writeAnswer(id);
+                                                if(peer!=null&&id.equals(active))writeAnswer(id);
                                             }
                                         }
                                         @Override public void onCreateFailure(String msg){updateState("answer_creation_failed");}
@@ -155,6 +173,32 @@ final class TabletLiveWebRtc {
             },new SessionDescription(SessionDescription.Type.OFFER,sdp));
         }
     }
+    private void watchRemoteIce(String id){
+        if(remoteIceListener!=null && !remoteIceSession.isEmpty())
+            offerCandidates.child(remoteIceSession).removeEventListener(remoteIceListener);
+        remoteIceSession=id;
+        remoteIceListener=new ChildEventListener(){
+            @Override public void onChildAdded(@NonNull DataSnapshot snapshot,String previous){
+                acceptRemoteIce(id,snapshot);
+            }
+            @Override public void onChildChanged(@NonNull DataSnapshot snapshot,String previous){}
+            @Override public void onChildRemoved(@NonNull DataSnapshot snapshot){}
+            @Override public void onChildMoved(@NonNull DataSnapshot snapshot,String previous){}
+            @Override public void onCancelled(@NonNull DatabaseError error){updateState("offer_ice_read_denied");}
+        };
+        offerCandidates.child(id).addChildEventListener(remoteIceListener);
+    }
+    private void acceptRemoteIce(String id,DataSnapshot snap){
+        String candidate=snap.child("candidate").getValue(String.class);
+        String mid=snap.child("sdpMid").getValue(String.class);
+        Long index=snap.child("sdpMLineIndex").getValue(Long.class);
+        if(candidate==null||candidate.length()>2000||index==null)return;
+        synchronized(gate){
+            if(!id.equals(active)||peer==null)return;
+            if(!peer.addIceCandidate(new IceCandidate(mid==null?"0":mid,index.intValue(),candidate)))
+                updateState("offer_ice_rejected");
+        }
+    }
     private void writeAnswer(String id){
         synchronized(gate){
             if(closed||peer==null||!active.equals(id))return;
@@ -172,6 +216,11 @@ final class TabletLiveWebRtc {
         liveState=state;
         diagnostics.setValue(state);
     }    private void closePeer(){
+        if(remoteIceListener!=null&&!remoteIceSession.isEmpty()){
+            offerCandidates.child(remoteIceSession).removeEventListener(remoteIceListener);
+            remoteIceListener=null;
+            remoteIceSession="";
+        }
         if(peer!=null){peer.dispose();peer=null;}
         active="";
     }

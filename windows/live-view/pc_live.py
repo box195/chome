@@ -17,6 +17,8 @@ from fractions import Fraction
 
 import av
 from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+from aiortc.sdp import candidate_from_sdp
+from on_demand_camera import CameraPreview,recorder_running
 
 ROOT = "https://chome-a8970-default-rtdb.firebaseio.com"
 API_KEY = "AIzaSyBeA0nsSOJ9HbV7ZLt4XAcgYX6uWfP7ANo"
@@ -70,6 +72,10 @@ class ClosedSegmentTrack(VideoStreamTrack):
         self.seen = set()
         self.n = 0
         self.last_preview_stamp = 0
+        self.camera=CameraPreview()
+        self.camera_stamp=0
+        self.check_owner_at=0
+        self.recorder_is_running=False
 
     def _fill(self):
         # Camera is owned by the existing recorder; do NOT open DirectShow a second time.
@@ -111,9 +117,30 @@ class ClosedSegmentTrack(VideoStreamTrack):
                     self.frames.extend(snapshots[-1:])
         except Exception:
             pass
+        now=time.monotonic()
+        if now-self.check_owner_at>=1.5:
+            self.check_owner_at=now
+            self.recorder_is_running=recorder_running()
+            if self.recorder_is_running:self.camera.close()
+        if not self.recorder_is_running:
+            # Camera opens only for an authenticated WebRTC viewer.
+            self.camera.start()
+            picture,stamp=self.camera.get()
+            if picture and stamp!=self.camera_stamp:
+                try:
+                    with av.open(io.BytesIO(picture),format="mjpeg") as image:
+                        frames=list(image.decode(video=0))
+                    if frames:
+                        self.camera_stamp=stamp
+                        self.frames.clear()
+                        self.frames.extend(frames[-1:])
+                except Exception:pass
         if len(self.seen) > 1000:
             self.seen = set(candidates[-40:])
 
+    def stop(self):
+        self.camera.close()
+        super().stop()
     async def recv(self):
         while not self.frames:
             await asyncio.to_thread(self._fill)
@@ -127,75 +154,134 @@ class ClosedSegmentTrack(VideoStreamTrack):
         return frame
 
 
+async def poll_ice_candidates(owner, sid, peer):
+    """Apply browser ICE candidates arriving after the offer was published."""
+    processed = set()
+    started = time.monotonic()
+    while peer.connectionState not in ("failed", "closed") and time.monotonic()-started < 95:
+        try:
+            candidates = await asyncio.to_thread(owner.request, "offerCandidates/"+sid)
+            if isinstance(candidates, dict):
+                for key, data in candidates.items():
+                    if key in processed or not isinstance(data, dict):
+                        continue
+                    raw = data.get("candidate")
+                    if not isinstance(raw, str) or not raw.startswith("candidate:") or len(raw)>2000:
+                        processed.add(key)
+                        continue
+                    try:
+                        ice = candidate_from_sdp(raw[len("candidate:"):])
+                        ice.sdpMid = data.get("sdpMid") or "0"
+                        ice.sdpMLineIndex = int(data.get("sdpMLineIndex") or 0)
+                        await peer.addIceCandidate(ice)
+                    except Exception:
+                        pass
+                    processed.add(key)
+        except Exception:
+            pass
+        await asyncio.sleep(0.65)
+
+
 async def answer_offer(owner, offer):
     sid = offer.get("id")
     sdp = offer.get("sdp")
     created = offer.get("createdAt")
     if not isinstance(sid, str) or len(sid) != 32 or not all(c in "0123456789abcdef" for c in sid):
         return None
-    if not isinstance(sdp, str) or len(sdp) > 32768 or not isinstance(created, (int, float)):
+    if not isinstance(sdp, str) or len(sdp) > 32768 or not isinstance(created, (int,float)):
         return None
-    if abs(time.time() * 1000 - created) > 60000:
+    if abs(time.time()*1000-created)>60000:
         return None
     peer = RTCPeerConnection(RTCConfiguration(
         iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]))
+    pump=None
     try:
-        peer.addTrack(ClosedSegmentTrack())
-        await peer.setRemoteDescription(RTCSessionDescription(sdp=sdp, type="offer"))
+        track=ClosedSegmentTrack()
+        peer.addTrack(track)
+        peer._chome_track=track
+        await peer.setRemoteDescription(RTCSessionDescription(sdp=sdp,type="offer"))
+        pump=asyncio.create_task(poll_ice_candidates(owner,sid,peer))
         await peer.setLocalDescription(await peer.createAnswer())
-        await asyncio.to_thread(owner.request, "answer", "PUT", {
-            "id": sid, "sdp": peer.localDescription.sdp, "createdAt": int(time.time()*1000)
+        await asyncio.to_thread(owner.request,"answer","PUT",{
+            "id":sid,"sdp":peer.localDescription.sdp,"createdAt":int(time.time()*1000)
         })
         print("CHOME_PC_LIVE_ANSWER_WRITTEN")
-        return peer
+        return peer,pump
     except Exception:
-        await peer.close()
+        if pump:
+            pump.cancel()
+            await asyncio.gather(pump,return_exceptions=True)
+        await close_camera_peer(peer)
         raise
 
 
+async def close_camera_peer(peer):
+    if peer is None:return
+    track=getattr(peer,"_chome_track",None)
+    if track:track.stop()
+    await peer.close()
+
 async def main():
-    lock_path = pathlib.Path(os.environ["LOCALAPPDATA"]) / "USBHomeCamNAVER" / "remote" / "pc-live.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_file = open(lock_path, "a+b")
+    lock_path=pathlib.Path(os.environ["LOCALAPPDATA"])/"USBHomeCamNAVER"/"remote"/"pc-live.lock"
+    lock_path.parent.mkdir(parents=True,exist_ok=True)
+    lock_file=open(lock_path,"a+b")
     lock_file.seek(0)
-    if lock_file.read(1) == b"":
+    if lock_file.read(1)==b"":
         lock_file.write(b"0")
         lock_file.flush()
     try:
         lock_file.seek(0)
-        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        msvcrt.locking(lock_file.fileno(),msvcrt.LK_NBLCK,1)
     except OSError:
         print("CHOME_PC_LIVE_ALREADY_RUNNING")
         return
-    owner = OwnerAuth()
+    owner=OwnerAuth()
     if "--self-test" in sys.argv:
-        await asyncio.to_thread(owner.request, "offer")
+        await asyncio.to_thread(owner.request,"offer")
         print("CHOME_PC_LIVE_AUTH_TEST_PASS")
         return
-    last = ""
-    peer = None
+    last=""
+    peer=None
+    pump=None
     print("CHOME_PC_WEBRTC_SIGNALING_ACTIVE")
     try:
         while True:
             try:
-                offer = await asyncio.to_thread(owner.request, "offer")
-                sid = (offer or {}).get("id") if isinstance(offer, dict) else None
-                if sid and sid != last:
-                    last = sid
-                    if peer:
-                        await peer.close()
-                    peer = await answer_offer(owner, offer)
-                # Closed or failed ICE peers release track/encoder resources.
-                if peer and peer.connectionState in ("closed", "failed"):
-                    await peer.close()
-                    peer = None
+                offer=await asyncio.to_thread(owner.request,"offer")
+                sid=(offer or {}).get("id") if isinstance(offer,dict) else None
+                if sid and sid!=last:
+                    last=sid
+                    if pump:
+                        pump.cancel()
+                        await asyncio.gather(pump,return_exceptions=True)
+                        pump=None
+                    if peer:await close_camera_peer(peer)
+                    result=await answer_offer(owner,offer)
+                    if result:peer,pump=result
+                elif not sid and peer:
+                    if pump:
+                        pump.cancel()
+                        await asyncio.gather(pump,return_exceptions=True)
+                        pump=None
+                    await close_camera_peer(peer)
+                    peer=None
+                    last=""
+                if peer and peer.connectionState in ("closed","failed"):
+                    await close_camera_peer(peer)
+                    peer=None
+                    if pump:
+                        pump.cancel()
+                        await asyncio.gather(pump,return_exceptions=True)
+                        pump=None
             except Exception as error:
-                print("CHOME_PC_LIVE_SIGNAL_ERROR", type(error).__name__)
-            await asyncio.sleep(2)
+                print("CHOME_PC_LIVE_SIGNAL_ERROR",type(error).__name__)
+            await asyncio.sleep(1.0)
     finally:
-        if peer:
-            await peer.close()
+        if pump:
+            pump.cancel()
+            await asyncio.gather(pump,return_exceptions=True)
+        if peer:await close_camera_peer(peer)
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     asyncio.run(main())
