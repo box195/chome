@@ -333,7 +333,7 @@ internal sealed partial class CamForm : Form {
   };
   try{
    if(p.Start()){p.BeginErrorReadLine();p.BeginOutputReadLine();capture=p;lastCameraStart=DateTime.Now;Log("카메라 녹화 프로세스 실행됨: "+cameraName);}
-  }catch(Exception e){Error("녹화 시작 실패: "+e.Message);recording=false;}
+  }catch(Exception e){Error("녹화 시작 실패: "+e.Message);if(!motionOnly)if(!motionOnly)recording=false;}
  }
  void StopRecording(){
   if(!recording)return;recording=false;autoRecordPending=false;PersistRemoteDesired("STOP");

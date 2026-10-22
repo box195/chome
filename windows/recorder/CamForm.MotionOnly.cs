@@ -75,7 +75,7 @@ internal sealed partial class CamForm {
  void StopMotionProbe(){
   lock(motionProbeGuard){
    var p=motionProbe;motionProbe=null;
-   if(p!=null){try{if(!p.HasExited)p.Kill();}catch{}}
+   if(p!=null){try{if(!p.HasExited){p.Kill();p.WaitForExit(650);}}catch{}}
   }
  }
  void RunMotionProbe(Process p){
@@ -177,7 +177,7 @@ internal sealed partial class CamForm {
   if(options.Count==0)return false;
   if(options.Count<2 && DateTime.UtcNow-options[0].LastWriteTimeUtc<TimeSpan.FromMinutes(2))
    return false;
-  string stage=Path.Combine(data,"staging","continuous_"+Guid.NewGuid().ToString("N")+".ts");
+  string stage=Path.Combine(data,"staging",Path.GetFileNameWithoutExtension(options[0].Name)+"_bundle"+options.Count+".ts");
   Directory.CreateDirectory(Path.GetDirectoryName(stage));
   try{
    CloudBundler.Pack(ffmpeg,options,stage);
