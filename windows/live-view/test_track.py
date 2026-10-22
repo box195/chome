@@ -24,5 +24,16 @@ async def test():
         assert frame.width==320 and frame.height==180
         assert frame.pts>0
         print("PC_WEBRTC_CLOSED_SEGMENT_FRAME_TEST_PASS")
+        image=base/"preview.jpg"
+        subprocess.run([str(ffmpeg),"-nostdin","-hide_banner","-loglevel","error","-y",
+            "-f","lavfi","-i","testsrc=size=320x180:rate=6",
+            "-frames:v","1",str(image)],check=True)
+        import os
+        os.environ["CHOME_PREVIEW_JPEG"]=str(image)
+        live=pc_live.ClosedSegmentTrack()
+        live._fill()
+        assert live.last_preview_stamp>0
+        assert len(live.frames)>=1
+        print("PC_WEBRTC_LIVE_JPEG_FRAME_TEST_PASS")
 
 asyncio.run(test())
