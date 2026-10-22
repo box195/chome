@@ -158,7 +158,7 @@ async def poll_ice_candidates(owner, sid, peer):
     """Apply browser ICE candidates arriving after the offer was published."""
     processed = set()
     started = time.monotonic()
-    while peer.connectionState not in ("failed", "closed") and time.monotonic()-started < 95:
+    while peer.connectionState not in ("connected", "failed", "closed") and time.monotonic()-started < 95:
         try:
             candidates = await asyncio.to_thread(owner.request, "offerCandidates/"+sid)
             if isinstance(candidates, dict):

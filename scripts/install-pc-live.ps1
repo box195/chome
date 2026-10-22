@@ -4,6 +4,7 @@ $appRoot=Join-Path $env:LOCALAPPDATA 'USBHomeCamNAVER'
 $dest=Join-Path $appRoot 'live-view'
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'windows/live-view/pc_live.py') -Destination (Join-Path $dest 'pc_live.py') -Force
+Copy-Item -LiteralPath (Join-Path $root 'windows/live-view/on_demand_camera.py') -Destination (Join-Path $dest 'on_demand_camera.py') -Force
 Copy-Item -LiteralPath (Join-Path $root 'windows/live-view/requirements.txt') -Destination (Join-Path $dest 'requirements.txt') -Force
 $helperSrc=Join-Path $root 'windows/push-sender/ReadPushSecrets.exe'
 $helperDestDir=Join-Path $appRoot 'push-sender'
