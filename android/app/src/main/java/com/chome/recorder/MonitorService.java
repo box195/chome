@@ -25,7 +25,7 @@ import java.util.concurrent.*;
 public final class MonitorService extends LifecycleService {
     private static final int NOTIFICATION=4207;
     private static final String CHANNEL="chome_y700_camera";
-    private static final long SEGMENT_MS=30000L, POST_MS=120000L;
+    private static final long CONTINUOUS_SEGMENT_MS=30000L, MOTION_SEGMENT_MS=1000L, POST_MS=120000L;
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ExecutorService analyzer=Executors.newSingleThreadExecutor();
     private final MotionDetector detector=new MotionDetector();
@@ -41,25 +41,30 @@ public final class MonitorService extends LifecycleService {
     private ValueEventListener commandListener;
     private String ownerUid="",myUid="",mode="OFF",lastMotion="";
     private boolean cameraReady=false,closing=false,finalizingClip=false;
-    private long lastAnalyzed=0,lastMotionElapsed=0,lastCommandSeq=0,segmentStarted=0;
+    private long lastAnalyzed=0,lastMotionElapsed=0,lastCommandSeq=0,segmentStarted=0,motionEndsAt=0,lastStatusAt=0;
     private int motionDetections=0;
     private final Runnable ticker=new Runnable() {
         @Override public void run(){
             if(closing)return;
             try{
                 long now=SystemClock.elapsedRealtime();
-                if(cameraReady && mode.equals("CONTINUOUS") && recording==null)beginClip();
-                if(recording!=null) {
-                    if(mode.equals("CONTINUOUS") && now-segmentStarted>=SEGMENT_MS)endClip();
-                    if(mode.equals("MOTION") && now-lastMotionElapsed>POST_MS)endClip();
-                    if(mode.equals("OFF"))endClip();
+                boolean motionRunning=mode.equals("MOTION")&&motionEndsAt>now;
+                if(recording!=null){
+                    long slice=mode.equals("MOTION")?MOTION_SEGMENT_MS:CONTINUOUS_SEGMENT_MS;
+                    if(mode.equals("OFF")||(mode.equals("MOTION")&&!motionRunning)||
+                       now-segmentStarted>=slice)endClip();
+                } else if(!finalizingClip && cameraReady &&
+                    (mode.equals("CONTINUOUS")||motionRunning)){
+                    beginClip();
                 }
-                publishState();
-            }catch(Exception e){setLocalState("감시 오류: "+e.getClass().getSimpleName());}
-            main.postDelayed(this,2600);
+                if(now-lastStatusAt>=2600){
+                    lastStatusAt=now;
+                    publishState();
+                }
+            }catch(Exception e){setLocalState("Monitor tick error: "+e.getClass().getSimpleName());}
+            main.postDelayed(this,200);
         }
-    };
-    @Override public void onCreate(){
+    };    @Override public void onCreate(){
         super.onCreate();
         createChannel();
         holdScreenOffResources();
@@ -170,43 +175,55 @@ public final class MonitorService extends LifecycleService {
     private void onMotion(){
         if(closing||!mode.equals("MOTION"))return;
         long now=SystemClock.elapsedRealtime();
-        if(now-lastMotionElapsed>=1000L){
-            motionDetections++;
-            lastMotion=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",Locale.US).format(new Date());
-        }
+        if(motionEndsAt>now)return; // One fixed 120s session per detected event.
+        motionDetections++;
+        lastMotion=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",Locale.US).format(new Date());
         lastMotionElapsed=now;
-        if(recording==null && cameraReady)beginClip();
+        motionEndsAt=now+POST_MS;
         if(pushSender!=null)pushSender.motion(System.currentTimeMillis());
-    }
-    private void beginClip(){
+        if(recording==null&&!finalizingClip&&cameraReady)beginClip();
+        publishState();
+    }    private void beginClip(){
         if(closing||recording!=null||finalizingClip||!cameraReady||mode.equals("OFF"))return;
         try{
             File dir=MyboxUploadWorker.videoFolder(this);
-            if(!dir.exists()&&!dir.mkdirs())throw new IllegalStateException("영상 저장 폴더 생성 실패");
-            String name=new SimpleDateFormat("yyyyMMdd_HHmmss_SSS",Locale.US).format(new Date())+".mp4";
-            currentFile=new File(dir,name);
-            final File finishedFile=currentFile;
+            if(!dir.exists()&&!dir.mkdirs())throw new IllegalStateException("Video folder unavailable");
+            boolean motion=mode.equals("MOTION");
+            String name=(motion?"MOTION_":"CONT_")+
+                new SimpleDateFormat("yyyyMMdd_HHmmss_SSS",Locale.US).format(new Date())+".mp4";
+            final File file=new File(dir,name);
+            currentFile=file;
             PendingRecording pending=video.getOutput().prepareRecording(this,
-                new FileOutputOptions.Builder(currentFile).build());
+                new FileOutputOptions.Builder(file).build());
             segmentStarted=SystemClock.elapsedRealtime();
             recording=pending.start(ContextCompat.getMainExecutor(this),event->{
                 if(event instanceof VideoRecordEvent.Finalize){
                     VideoRecordEvent.Finalize finalized=(VideoRecordEvent.Finalize)event;
                     recording=null;
-                    if(!finalized.hasError() && currentFile!=null && currentFile.length()>1024){
-                        MyboxUploadWorker.schedule(this);
+                    finalizingClip=false;
+                    if(!finalized.hasError()&&file.exists()&&file.length()>1024){
+                        if(motion)MyboxUploadWorker.enqueueClip(this,file);
+                        else MyboxUploadWorker.schedule(this);
+                    }else if(finalized.hasError()){
+                        setLocalState("Video finalize failure: "+finalized.getError());
                     }
-                    if(!closing && mode.equals("CONTINUOUS"))main.postDelayed(()->beginClip(),300);
+                    long time=SystemClock.elapsedRealtime();
+                    boolean stillNeeded=mode.equals("CONTINUOUS")||
+                        (mode.equals("MOTION")&&motionEndsAt>time);
+                    if(!closing&&cameraReady&&stillNeeded)
+                        main.postDelayed(()->{if(!finalizingClip&&recording==null)beginClip();},60);
                 }
             });
-            setLocalState("녹화 중 ("+(mode.equals("CONTINUOUS")?"상시":"움직임")+")");
-        }catch(Exception e){recording=null;setLocalState("녹화 시작 오류: "+e.getClass().getSimpleName());}
+        }catch(Exception e){recording=null;finalizingClip=false;
+            setLocalState("Video start error: "+e.getClass().getSimpleName());}
     }
-    private void endClip() {
-        Recording previous=recording;recording=null;
-        if(previous!=null){try{previous.stop();}catch(Exception ignored){}}
-    }
-    private void verifyPairAndAttach() {
+    private void endClip(){
+        Recording current=recording;
+        if(current==null||finalizingClip)return;
+        finalizingClip=true;
+        recording=null;
+        try{current.stop();}catch(Exception e){finalizingClip=false;}
+    }    private void verifyPairAndAttach() {
         String path="clients/"+ownerUid+"/devices/y700/authUid";
         FirebaseDatabase.getInstance().getReference(path)
             .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -245,12 +262,12 @@ public final class MonitorService extends LifecycleService {
                 Settings.publicPrefs(MonitorService.this).edit().putLong("lastY700CommandSeq",seq).apply();
                 if(!cameraReady) {ack(id,seq,action,"failed","camera_not_ready");return;}
                 if("STOP".equals(action)){
-                    mode="OFF";endClip();setLocalState("감시 준비 / 녹화 중지됨");
+                    mode="OFF";motionEndsAt=0;endClip();setLocalState("감시 준비 / 녹화 중지됨");
                     ack(id,seq,action,"applied","recording_stopped");publishState();
                 }else if("START".equals(action)&&("MOTION".equals(requestedMode)||"CONTINUOUS".equals(requestedMode))){
-                    String previous=mode;mode=requestedMode;
+                    String previous=mode;mode=requestedMode;motionEndsAt=0;
                     if(!previous.equals(mode))endClip();
-                    if(mode.equals("CONTINUOUS"))beginClip();
+                    if(mode.equals("CONTINUOUS")&&!finalizingClip)beginClip();
                     setLocalState(mode.equals("MOTION")?"움직임 감지 대기":"상시 녹화 시작");
                     ack(id,seq,action,"applied","mode_"+mode);publishState();
                 }else ack(id,seq,action,"failed","unknown_action_or_mode");
@@ -281,6 +298,7 @@ public final class MonitorService extends LifecycleService {
         data.put("monitoring",true);data.put("cameraConnected",cameraReady);
         data.put("recording",recording!=null);data.put("mode",mode);
         data.put("motionDetections",motionDetections);data.put("lastMotion",lastMotion);
+        data.put("liveState",liveWebRtc==null?"offline":liveWebRtc.getState());
         data.put("localClips",local);data.put("uploadedClips",uploaded);
         data.put("pendingUploads",local-uploaded);data.put("cloudConnected",!Settings.token(this).isEmpty());
         deviceRef.child("status").setValue(data,(error,ref)->{

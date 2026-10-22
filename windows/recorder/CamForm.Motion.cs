@@ -40,7 +40,7 @@ internal sealed partial class CamForm {
   if(motionStatusLabel==null || motionStatusLabel.IsDisposed)return;
   string status;
   lock(motionGuard){
-   status=motionWindow.Active?"움직임 감지됨 · 이벤트 녹화 중":"움직임 감시 중";
+   status=(motionOnly?motionEventActive:motionWindow.Active)?"움직임 감지됨 · 이벤트 녹화 중":"움직임 감시 중";
   }
   motionStatusLabel.Text=status+" | 높음 · 사전30초 · 사후120초 · 알림1초";
  }

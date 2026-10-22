@@ -40,7 +40,8 @@ internal sealed partial class CamForm {
  void OnNewSegment(string path){
   if(!path.EndsWith(".ts",StringComparison.OrdinalIgnoreCase))return;
   if(!path.Contains(Path.DirectorySeparatorChar+"raw"+Path.DirectorySeparatorChar) &&
-     !path.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar))return;
+     !path.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar) &&
+     !path.Contains(Path.DirectorySeparatorChar+"motion-chunks"+Path.DirectorySeparatorChar))return;
   string closed=null;
   lock(segmentSync){
    if(!string.Equals(activeSegmentPath,path,StringComparison.OrdinalIgnoreCase)){
@@ -52,13 +53,14 @@ internal sealed partial class CamForm {
   }
   if(!string.IsNullOrEmpty(closed)){
    if(!closed.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar))QueueFresh(closed);
-   QueueMotionProbe(closed);
+   if(!closed.Contains(Path.DirectorySeparatorChar+"motion-chunks"+Path.DirectorySeparatorChar))QueueMotionProbe(closed);
   }
  }
  void OnChangedSegment(string path){
   if(!path.EndsWith(".ts",StringComparison.OrdinalIgnoreCase))return;
   if(!path.Contains(Path.DirectorySeparatorChar+"raw"+Path.DirectorySeparatorChar) &&
-     !path.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar))return;
+     !path.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar) &&
+     !path.Contains(Path.DirectorySeparatorChar+"motion-chunks"+Path.DirectorySeparatorChar))return;
   lock(segmentSync){
    if(string.Equals(activeSegmentPath,path,StringComparison.OrdinalIgnoreCase))
     lastVideoEvent=DateTime.Now;
@@ -95,6 +97,10 @@ internal sealed partial class CamForm {
       var item=new FileInfo(name);
       if(item.Length>1000&&File.Exists(Path.Combine(item.DirectoryName,"upload-event.marker"))&&!File.Exists(Marker(item))){list.Add(item);pending++;}
     }
+    string motionFolder=Path.Combine(recordRoot,"motion-chunks");
+    if(Directory.Exists(motionFolder))foreach(var file in Directory.GetFiles(motionFolder,"*.ts",SearchOption.AllDirectories)){
+      var item=new FileInfo(file);if(item.Length>1000&&!File.Exists(Marker(item))&&!string.Equals(item.FullName,active,StringComparison.OrdinalIgnoreCase)){list.Add(item);pending++;}
+    }
     // New capture receives higher priority; older recordings are drained when bandwidth is free.
     foreach(var item in list.OrderBy(x=>x.LastWriteTimeUtc).Take(12000))QueueArchive(item.FullName);
     pendingUploads=pending;
@@ -115,6 +121,7 @@ internal sealed partial class CamForm {
  bool TryUploadClip(string path,string token){
   FileInfo f;
   try{f=new FileInfo(path);if(!f.Exists || f.Length<1000)return false;}catch{return false;}
+  if(path.Contains(Path.DirectorySeparatorChar+"raw"+Path.DirectorySeparatorChar))return TryUploadContinuousBundle(path,token);
   string active;lock(segmentSync){active=activeSegmentPath;}
   if(string.Equals(active,path,StringComparison.OrdinalIgnoreCase) && recording)return false;
   if(path.Contains(Path.DirectorySeparatorChar+"raw-motion"+Path.DirectorySeparatorChar))return false;

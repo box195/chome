@@ -1,6 +1,7 @@
 """Read-only-on-camera PC live preview. Reuses closed TS segments, never reopens USB camera."""
 import asyncio
 import glob
+import io
 import json
 import os
 import sys
@@ -68,6 +69,7 @@ class ClosedSegmentTrack(VideoStreamTrack):
         self.frames = deque()
         self.seen = set()
         self.n = 0
+        self.last_preview_stamp = 0
 
     def _fill(self):
         # Camera is owned by the existing recorder; do NOT open DirectShow a second time.
@@ -77,6 +79,8 @@ class ClosedSegmentTrack(VideoStreamTrack):
         candidates = sorted(candidates, key=lambda p: os.path.getmtime(p))
         # Newest segment may still be written. Only read closed files.
         for path in candidates[-7:-1]:
+            if time.time() - os.path.getmtime(path) > 35:
+                continue
             if path in self.seen:
                 continue
             self.seen.add(path)
@@ -90,6 +94,23 @@ class ClosedSegmentTrack(VideoStreamTrack):
                 self.frames.extend(frames[::max(1, len(frames)//8)][:10])
             except Exception:
                 continue
+        # The recorder or motion detector keeps a single atomically replaced JPG
+        # frame for preview; there is no idle video recording.
+        image_path = pathlib.Path(os.environ.get("CHOME_PREVIEW_JPEG",str(pathlib.Path(os.environ["LOCALAPPDATA"]) / "USBHomeCamNAVER" / "remote" / "preview.jpg")))
+        try:
+            stamp = image_path.stat().st_mtime_ns
+            if stamp != self.last_preview_stamp and time.time_ns() - stamp < 4_000_000_000:
+                with image_path.open("rb") as stream:
+                    payload = stream.read(400000)
+                with av.open(io.BytesIO(payload), format="mjpeg") as image:
+                    snapshots = list(image.decode(video=0))
+                if snapshots:
+                    self.last_preview_stamp = stamp
+                    # Prefer current camera frames over old recorded TS files.
+                    self.frames.clear()
+                    self.frames.extend(snapshots[-1:])
+        except Exception:
+            pass
         if len(self.seen) > 1000:
             self.seen = set(candidates[-40:])
 

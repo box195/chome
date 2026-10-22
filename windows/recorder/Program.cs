@@ -256,7 +256,7 @@ internal sealed partial class CamForm : Form {
   Task.Run(()=>{
    try{
     var p=new Process();
-    p.StartInfo=new ProcessStartInfo(ffmpeg,"-hide_banner -list_devices true -f dshow -i dummy") {UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true};
+    p.StartInfo=new ProcessStartInfo(ffmpeg,"-hide_banner -list_devices true -f dshow -i dummy") {UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true,RedirectStandardInput=true};
     p.Start();string text=p.StandardError.ReadToEnd();p.WaitForExit(12000);
     if(!p.HasExited)try{p.Kill();}catch{}
     var found=Regex.Matches(text,"\"([^\"]+)\"\\s*\\(video\\)",RegexOptions.IgnoreCase).Cast<Match>().Select(m=>m.Groups[1].Value).Distinct().ToList();
@@ -279,13 +279,15 @@ internal sealed partial class CamForm : Form {
  }
  static string Limit(string x,int n){return x.Length>n?x.Substring(0,n)+"...":x;}
  void ChooseFolder(){
-  if(recording){MessageBox.Show("녹화를 중지한 다음 폴더를 변경하세요.");return;}
-  using(var dlg=new FolderBrowserDialog()){dlg.Description="영상이 계속 저장될 폴더 선택 (여유 공간 확인)";
-    if(Directory.Exists(recordRoot))dlg.SelectedPath=recordRoot;
-    if(dlg.ShowDialog(this)==DialogResult.OK){recordRoot=dlg.SelectedPath;WriteSettings();Log("저장 폴더 변경: "+recordRoot);RefreshLabels();}
+  if(recording){MessageBox.Show("감시/녹화를 중지한 뒤 저장 폴더를 변경하세요.");return;}
+  using(var dlg=new FolderBrowserDialog()){
+   dlg.Description="녹화파일 저장 폴더 선택";
+   if(Directory.Exists(recordRoot))dlg.SelectedPath=recordRoot;
+   if(dlg.ShowDialog(this)==DialogResult.OK){
+    recordRoot=dlg.SelectedPath;WriteSettings();Log("녹화 폴더 변경: "+recordRoot);RefreshLabels();
+   }
   }
- }
- void OpenFolder(){Directory.CreateDirectory(recordRoot);Process.Start("explorer.exe",recordRoot);}
+ } void OpenFolder(){Directory.CreateDirectory(recordRoot);Process.Start("explorer.exe",recordRoot);}
  bool HasStartup(){
   try{using(var k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")){
    var v=k==null?"":(k.GetValue("USBHomeCamNAVER") as string ?? "");
@@ -307,20 +309,22 @@ internal sealed partial class CamForm : Form {
    var d=new DriveInfo(Path.GetPathRoot(recordRoot));if(d.AvailableFreeSpace<minDiskGb*1024L*1024*1024){Error("디스크 여유 공간이 15GB 미만이라 녹화를 시작할 수 없습니다.");return;}
   }catch(Exception ex){Error("저장 디스크 확인 실패: "+ex.Message);return;}
   recording=true;autoRecordPending=false;PersistRemoteDesired("START");Log("연속 녹화 시작. 10초 TS 파일 분할, 클라우드 자동 백업.");
-  StartCapture();RefreshLabels();
+  if(motionOnly)StartMotionProbe();else StartCapture();RefreshLabels();
    if(Entry.AutoMotionIntegrationTest){Entry.AutoMotionIntegrationTest=false;Task.Run(()=>{Thread.Sleep(32000);try{BeginInvoke((Action)delegate{if(recording)ForceMotionTest();});}catch{}});}
  }
  void StartCapture(){
-  if(!recording || capture!=null&&!capture.HasExited)return;
+  if(!recording || motionOnly&&!motionEventActive || capture!=null&&!capture.HasExited)return;
   var day=DateTime.Now.ToString("yyyy-MM-dd");
-  var dir=Path.Combine(recordRoot,motionOnly?"raw-motion":"raw",day);Directory.CreateDirectory(dir);
+  var dir=Path.Combine(recordRoot,motionOnly?"motion-chunks":"raw",day);Directory.CreateDirectory(dir);
   string file=Path.Combine(dir,"%Y-%m-%d_%H-%M-%S.ts");
-  string arg="-nostdin -hide_banner -loglevel warning -f dshow -i "+Q("video="+cameraName)+
+  string arg=(motionOnly?"":"-nostdin ")+"-hide_banner -loglevel warning -f dshow -i "+Q("video="+cameraName)+
    " -an -c:v libx264 -preset ultrafast -tune zerolatency -crf 28 -pix_fmt yuv420p "+
    "-force_key_frames "+Q("expr:gte(t,n_forced*1)")+
-   " -f segment -segment_time "+chunkSeconds+" -reset_timestamps 1 -strftime 1 -segment_format mpegts "+Q(file);
+   " -f segment -segment_time "+(motionOnly?1:chunkSeconds)+" -reset_timestamps 1 -strftime 1 -segment_format mpegts "+Q(file)+
+   " -map 0:v:0 -vf "+Q("fps=6,scale=320:180:flags=fast_bilinear")+
+   " -q:v 7 -update 1 -atomic_writing 1 -f image2 "+Q(Path.Combine(remotePath,"preview.jpg"));
   var p=new Process();
-  p.StartInfo=new ProcessStartInfo(ffmpeg,arg){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true};
+  p.StartInfo=new ProcessStartInfo(ffmpeg,arg){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true,RedirectStandardInput=true};
   p.ErrorDataReceived+=delegate(object s,DataReceivedEventArgs e){
    if(e.Data==null||string.IsNullOrEmpty(e.Data))return;
    if(e.Data.IndexOf("frame=",StringComparison.OrdinalIgnoreCase)>=0)return;
@@ -333,7 +337,9 @@ internal sealed partial class CamForm : Form {
  }
  void StopRecording(){
   if(!recording)return;recording=false;autoRecordPending=false;PersistRemoteDesired("STOP");
-  try{if(capture!=null && !capture.HasExited)capture.Kill();}catch{}
+  StopMotionProbe();
+  if(motionOnly&&motionEventActive){GracefulCloseMotionCapture();motionEventActive=false;motionWindow.Close();}
+  else try{if(capture!=null && !capture.HasExited)capture.Kill();}catch{}
   Log("녹화 중지. 기존 로컬/클라우드 영상은 삭제하지 않습니다.");
   RefreshLabels();
  }
@@ -341,6 +347,9 @@ internal sealed partial class CamForm : Form {
   if(exiting)return;
   if(!scanning && !recording && (DateTime.Now-lastCameraScan).TotalSeconds>25 && string.IsNullOrEmpty(cameraName)) ScanCameras();
   if(recording){
+   if(motionOnly){
+    TickMotionSession();
+   }else{
     try{
      var d=new DriveInfo(Path.GetPathRoot(recordRoot));
      if(d.AvailableFreeSpace<minDiskGb*1024L*1024*1024){Error("디스크 부족: 녹화를 안전하게 중지합니다.");StopRecording();}
@@ -366,24 +375,25 @@ internal sealed partial class CamForm : Form {
       }
      }
     }catch(Exception e){Error("녹화 감시: "+Limit(e.Message,130));}
+   }
   }
   if(!loginBusy && (DateTime.Now-lastCloudProbe).TotalSeconds>300)CheckGoogleConnection();
   if(!recording && autoRecordPending && !string.IsNullOrEmpty(cameraName) && !OldVersionRunning())StartRecording();
   UpdatePendingCount();
   if(loggedIn && !uploadBusy && (DateTime.Now-lastUploadAttempt).TotalSeconds>=0.5)UploadPass();
-  RemoteTick();MotionRuntimeTick();PruneMotionPrebuffer();RefreshLabels();
+  RemoteTick();MotionRuntimeTick();RefreshLabels();
  }
  static string HexHash(byte[] content,HashAlgorithm hash){
   using(hash){return BitConverter.ToString(hash.ComputeHash(content)).Replace("-","").ToLowerInvariant();}
  }
  void OnFormClosing(object sender,FormClosingEventArgs e){
   if(recording){
-   var answer=MessageBox.Show(this,"녹화 중입니다. 종료하면 녹화가 중단됩니다.\n기존 저장 파일은 보존됩니다.\n프로그램을 종료할까요?","녹화 종료 확인",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+   var answer=MessageBox.Show(this,"녹화 또는 감시 중입니다. 종료하면 중단됩니다. 기존 녹화 파일은 보존됩니다.\n종료할까요?","CHome 종료 확인",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
    if(answer!=DialogResult.Yes){e.Cancel=true;return;}
   }
-  StopMotionRuntime();exiting=true;recording=false;cancel.Cancel();
-  try{if(capture!=null && !capture.HasExited)capture.Kill();}catch{}
+  StopMotionProbe();StopMotionRuntime();
+  if(motionOnly&&motionEventActive){GracefulCloseMotionCapture();motionEventActive=false;}
+  exiting=true;recording=false;cancel.Cancel();
+  try{if(capture!=null&&!capture.HasExited)capture.Kill();}catch{}
  }
 }
-
-

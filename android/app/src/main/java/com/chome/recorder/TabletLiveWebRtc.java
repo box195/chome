@@ -13,7 +13,8 @@ import java.util.*;
 /** Firebase carries signaling only. The existing CameraX analyzer supplies video. */
 final class TabletLiveWebRtc {
     private final Context context;
-    private final DatabaseReference offer,answer;
+    private final DatabaseReference offer,answer,diagnostics;
+    private volatile String liveState="starting";
     private final Handler main=new Handler(Looper.getMainLooper());
     private final Object gate=new Object();
     private PeerConnectionFactory factory;
@@ -30,7 +31,7 @@ final class TabletLiveWebRtc {
         context=c.getApplicationContext();
         DatabaseReference base=FirebaseDatabase.getInstance().getReference(
             "clients/"+owner+"/devices/y700/live");
-        offer=base.child("offer");answer=base.child("answer");
+        offer=base.child("offer");answer=base.child("answer");diagnostics=base.child("state");
     }
     void start(){
         try{
@@ -44,7 +45,7 @@ final class TabletLiveWebRtc {
             source=factory.createVideoSource(false);
             observer=source.getCapturerObserver();observer.onCapturerStarted(true);
             track=factory.createVideoTrack("CHome-Y700",source);
-        }catch(Exception e){return;}
+        }catch(Exception e){updateState("android_webrtc_init_failed");return;}
         listener=new ValueEventListener(){
             @Override public void onDataChange(@NonNull DataSnapshot data){
                 if(closed)return;
@@ -54,9 +55,9 @@ final class TabletLiveWebRtc {
                 if(id==null||sdp==null||time==null||!id.matches("[a-f0-9]{32}")||
                     sdp.length()>32768||Math.abs(System.currentTimeMillis()-time)>60000)return;
                 synchronized(gate){if(active.equals(id))return;}
-                open(id,sdp);
+                updateState("offer_received");open(id,sdp);
             }
-            @Override public void onCancelled(@NonNull DatabaseError error){}
+            @Override public void onCancelled(@NonNull DatabaseError error){updateState("firebase_offer_read_denied");}
         };
         offer.addValueEventListener(listener);
     }
@@ -94,6 +95,7 @@ final class TabletLiveWebRtc {
             if(closed||factory==null)return;
             closePeer();
             active=id;
+            updateState("offer_processing");
             List<PeerConnection.IceServer> ice=Collections.singletonList(
                 PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer());
             PeerConnection.RTCConfiguration cfg=new PeerConnection.RTCConfiguration(ice);
@@ -101,6 +103,7 @@ final class TabletLiveWebRtc {
             peer=factory.createPeerConnection(cfg,new PeerConnection.Observer(){
                 @Override public void onSignalingChange(PeerConnection.SignalingState state){}
                 @Override public void onIceConnectionChange(PeerConnection.IceConnectionState state){
+                    updateState("ice_"+state.name().toLowerCase(java.util.Locale.ROOT));
                     if(state==PeerConnection.IceConnectionState.FAILED)
                         main.post(()->{synchronized(gate){if(active.equals(id))closePeer();}});
                 }
@@ -116,16 +119,28 @@ final class TabletLiveWebRtc {
                 @Override public void onRenegotiationNeeded(){}
                 @Override public void onAddTrack(RtpReceiver receiver,MediaStream[] streams){}
             });
-            if(peer==null)return;
-            peer.addTrack(track,Collections.singletonList("CHome"));
+            if(peer==null){updateState("peer_creation_failed");return;}
             peer.setRemoteDescription(new SdpObserver(){
                 @Override public void onSetSuccess(){
                     synchronized(gate){
                         if(peer==null||!active.equals(id))return;
+                        peer.addTrack(track,Collections.singletonList("CHome"));
+                        updateState("remote_offer_accepted");
                         peer.createAnswer(new SdpObserver(){
                             @Override public void onCreateSuccess(SessionDescription local){
                                 synchronized(gate){
-                                    if(peer!=null&&active.equals(id))peer.setLocalDescription(new EmptySdp(),local);
+                                    if(peer!=null&&active.equals(id))peer.setLocalDescription(new SdpObserver(){
+                                        @Override public void onCreateSuccess(SessionDescription desc){}
+                                        @Override public void onSetSuccess(){
+                                            updateState("local_answer_ready");
+                                            synchronized(gate){
+                                                if(peer!=null&&peer.iceGatheringState()==PeerConnection.IceGatheringState.COMPLETE)
+                                                    writeAnswer(id);
+                                            }
+                                        }
+                                        @Override public void onCreateFailure(String msg){updateState("answer_creation_failed");}
+                                        @Override public void onSetFailure(String msg){updateState("answer_setting_failed");}
+                                    },local);
                                 }
                             }
                             @Override public void onSetSuccess(){}
@@ -148,10 +163,15 @@ final class TabletLiveWebRtc {
             Map<String,Object> packet=new HashMap<>();
             packet.put("id",id);packet.put("sdp",d.description);
             packet.put("createdAt",System.currentTimeMillis());
-            answer.setValue(packet);
+            answer.setValue(packet,(error,r)->updateState(error==null?"answer_written":"answer_write_denied"));
         }
     }
-    private void closePeer(){
+    String getState(){return liveState;}
+    private void updateState(String state){
+        if(state==null||closed||state.equals(liveState))return;
+        liveState=state;
+        diagnostics.setValue(state);
+    }    private void closePeer(){
         if(peer!=null){peer.dispose();peer=null;}
         active="";
     }

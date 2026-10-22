@@ -1,5 +1,5 @@
 /** One viewer per camera. Firebase transports SDP signaling, not media. */
-export function makeLiveView({db,ref,set,remove,onValue,$}) {
+export function makeLiveView({db,ref,set,remove,onValue,$,getPcState}) {
   let user=null;
   const active=new Map();
   const path=(kind,uid)=>kind==="y700"
@@ -10,6 +10,7 @@ export function makeLiveView({db,ref,set,remove,onValue,$}) {
     if(!task)return;
     active.delete(kind);task.cancelled=true;
     if(task.off)task.off();
+    if(task.offState)task.offState();
     task.pc.close();
     const video=$("liveVideo-"+kind);video.pause();video.srcObject=null;
     $("liveButton-"+kind).textContent="실시간 보기";
@@ -34,12 +35,19 @@ export function makeLiveView({db,ref,set,remove,onValue,$}) {
   }
   async function start(kind){
     if(!user||active.has(kind))return;
+    if(kind==="pc"&&!getPcState()?.online){
+      status(kind,"PC 녹화기가 꺼져 있어 영상이 없습니다. PC 감시/녹화부터 시작해 주세요.");return;
+    }
     const uid=user.uid,id=crypto.randomUUID().replaceAll("-",""),p=path(kind,uid);
     const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-    const task={id,path:p,pc,cancelled:false,off:null};active.set(kind,task);
+    const task={id,path:p,pc,cancelled:false,off:null,offState:null};active.set(kind,task);
     $("liveButton-"+kind).textContent="영상 중지";
     status(kind,"WebRTC 연결 준비 중");
-    pc.addTransceiver("video",{direction:"recvonly"});
+    if(kind==="y700")task.offState=onValue(ref(db,p+"/state"),s=>{
+      const state=s.val();
+      if(!task.cancelled&&typeof state==="string"&&pc.connectionState!=="connected")
+        status(kind,"Y700 영상 연결: "+state);
+    },e=>status(kind,"Y700 영상 진단 조회 실패: "+e.code));    pc.addTransceiver("video",{direction:"recvonly"});
     pc.ontrack=e=>{
       if(task.cancelled)return;
       const v=$("liveVideo-"+kind);
@@ -70,8 +78,8 @@ export function makeLiveView({db,ref,set,remove,onValue,$}) {
           status(kind,"시간 초과: 장치 연결 또는 ICE/TURN 확인 필요");
       },35000);
     }catch(e){
-      status(kind,"연결 실패: "+(e.message||e.code));
       await stop(kind);
+      status(kind,"연결 실패: "+(e.message||e.code));
     }
   }
   const card=kind=>'<div style="min-width:0"><strong>'+

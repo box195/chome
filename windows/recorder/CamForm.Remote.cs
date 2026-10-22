@@ -57,7 +57,7 @@ internal sealed partial class CamForm {
      cloudConnected=loggedIn,
      uploading=uploadBusy,
      pendingUploads=pendingUploads,
-     motionActive=motionWindow.Active,
+     motionActive=motionOnly?motionEventActive:motionWindow.Active,
      motionDetections=motionPositiveClips,
      lastMotion=motionWindow.LastMotion==DateTime.MinValue?"":motionWindow.LastMotion.ToString("o"),
      lastSegment=lastCaptureFile,
