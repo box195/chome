@@ -257,15 +257,24 @@ static class CHomeCloud {
   }
   Ack(token,c,"queued","awaiting_recorder",now);
  }
- static void Loop(){
+  static void WriteHeartbeat(bool ok,string error){
+  try{
+   string path=Path.Combine(Folder,"firebase-heartbeat.json");
+   string temp=path+".tmp";
+   string safe=System.Text.RegularExpressions.Regex.IsMatch(error??"", "^[A-Za-z_][A-Za-z0-9_:-]{0,60}$")?error:"cloud_unavailable";
+   File.WriteAllText(temp,J.Serialize(new{updatedAt=DateTime.UtcNow.ToString("o"),ok=ok,error=safe}),Encoding.UTF8);
+   if(File.Exists(path))File.Replace(temp,path,null);
+   else File.Move(temp,path);
+  }catch{}
+ } static void Loop(){
   while(Working) {
    try {
     string refresh,uid,id;
     lock(Sync){refresh=RefreshToken;uid=Uid;id=IdToken;}
-    if(string.IsNullOrEmpty(refresh)||string.IsNullOrEmpty(uid)){Thread.Sleep(3000);continue;}
+    if(string.IsNullOrEmpty(refresh)||string.IsNullOrEmpty(uid)){WriteHeartbeat(false,"credentials_unavailable");Thread.Sleep(3000);continue;}
     string approved="";
     try{approved=File.ReadAllText(OwnerFile,Encoding.UTF8).Trim();}catch{}
-    if(approved!=uid){Thread.Sleep(7000);continue;}
+    if(approved!=uid){WriteHeartbeat(false,"owner_unapproved");Thread.Sleep(7000);continue;}
     if(string.IsNullOrEmpty(id)||DateTime.UtcNow>=TokenExpiry){
      var res=Exchange(refresh);
      lock(Sync){
@@ -281,15 +290,15 @@ static class CHomeCloud {
     // Complete an earlier command (including after a bridge restart) before reading a new one.
     ProcessPending(id,local,now);
     HandleCloudCommand(id,uid,Request("GET","command",id),now);
-    Request("PUT","status",id,J.Serialize(PublishableState(local,now)));
+    Request("PUT","status",id,J.Serialize(PublishableState(local,now)));WriteHeartbeat(true,"");
     Thread.Sleep(2400);
    }catch(WebException e){
     var r=e.Response as HttpWebResponse;
-    if(r!=null && (r.StatusCode==HttpStatusCode.Unauthorized || r.StatusCode==HttpStatusCode.Forbidden)){
+    WriteHeartbeat(false,r==null?"network_unavailable":"http_"+((int)r.StatusCode).ToString());if(r!=null && (r.StatusCode==HttpStatusCode.Unauthorized || r.StatusCode==HttpStatusCode.Forbidden)){
      lock(Sync){IdToken=null;TokenExpiry=DateTime.MinValue;}
     }
     Thread.Sleep(7000);
-   }catch(Exception){Thread.Sleep(5000);}
+   }catch(Exception e){WriteHeartbeat(false,e.GetType().Name);Thread.Sleep(5000);}
   }
  }
 }

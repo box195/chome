@@ -69,6 +69,7 @@ async function tick(){
  }
  await db('senderStatus','PUT',{updatedAt:Date.now(),online:true,devices:Object.keys(subscriptions).length,submissions});
 }
+async function heartbeat(ok,error=''){await writeFile(join(folder,'push-heartbeat.json'),JSON.stringify({updatedAt:new Date().toISOString(),ok,error})).catch(()=>{});}
 async function main(){
  await mkdir(folder,{recursive:true});
  try{
@@ -82,8 +83,8 @@ async function main(){
  cursor=await readJson(cursorFile);
  try{
   do{
-   try{await tick();lastLog='';}
-   catch(error){const safe=/^(authentication_failed|owner_mismatch|database_\d+)$/.test(error.message)?error.message:'sender_unavailable';if(safe!==lastLog){await writeFile(join(folder,'push-sender.log'),new Date().toISOString()+' '+safe+'\n',{flag:'a'});lastLog=safe;}}
+   try{await tick();lastLog='';await heartbeat(true);}
+   catch(error){const safe=/^(authentication_failed|owner_mismatch|database_\d+)$/.test(error.message)?error.message:'sender_unavailable';if(safe!==lastLog){await writeFile(join(folder,'push-sender.log'),new Date().toISOString()+' '+safe+'\n',{flag:'a'});lastLog=safe;}await heartbeat(false,safe);}
    if(process.argv.includes('--once'))break;
    await new Promise(resolve=>setTimeout(resolve,5000));
   }while(true);

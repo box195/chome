@@ -41,12 +41,13 @@ internal sealed partial class CamForm {
   if(wasActive)StartRecording();
  }
  void SetupRecordingModeUI(FlowLayoutPanel panel){
-  panel.Controls.Add(new Label{Text="PC mode",Width=65,Height=26,TextAlign=ContentAlignment.MiddleLeft});
+  var group=new FlowLayoutPanel{Width=300,Height=37,WrapContents=false,Margin=new Padding(4,2,4,2)};
+  group.Controls.Add(new Label{Text="녹화 방식",Width=80,Height=30,TextAlign=ContentAlignment.MiddleLeft});
   pcRecordingModeBox=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=180};
-  pcRecordingModeBox.Items.AddRange(new object[]{"Continuous","Motion-only: 1s x 120s"});
+  pcRecordingModeBox.Items.AddRange(new object[]{"상시 녹화","움직임 감지 녹화 (1초 조각)"});
   pcRecordingModeBox.SelectedIndex=motionOnly?1:0;
   pcRecordingModeBox.SelectedIndexChanged+=delegate{SetRecordingMode(pcRecordingModeBox.SelectedIndex==1);};
-  panel.Controls.Add(pcRecordingModeBox);
+  group.Controls.Add(pcRecordingModeBox);panel.Controls.Add(group);
  }
  // The detector never creates video files. Only a single replaceable JPEG
  // supports on-demand live preview when waiting for movement.

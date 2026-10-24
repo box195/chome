@@ -14,24 +14,25 @@ using System.Reflection;
 using Microsoft.Win32;
 
 internal static class Entry {
- internal static bool AutoMotionIntegrationTest=false;
+ internal static bool AutoMotionIntegrationTest=false; internal static bool StartHidden=false;
  [STAThread] static void Main(string[] args) {
-  if(args.Length>0 && args[0]=="--selftest") {Environment.Exit(SelfTest()?0:1);return;}
+  if(args.Length>0 && args[0]=="--supervisor-selftest") {Environment.Exit(SupervisorLogic.SelfTest(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"test-results","supervisor.txt"))?0:1);return;}
+   if(args.Length>0 && args[0]=="--selftest") {Environment.Exit(SelfTest()?0:1);return;}
    if(args.Length>0 && args[0]=="--motion-selftest") {string a,b;bool aok=FixedCameraMotion.SelfTest(out a);bool bok=MotionWindow.SelfTest(out b);Console.WriteLine("MOTION_DETECTOR: "+a);Console.WriteLine("MOTION_WINDOW: "+b);Environment.Exit(aok&&bok?0:1);return;}
-  if(args.Contains("--motion-test-live"))AutoMotionIntegrationTest=true;
+  if(args.Contains("--motion-test-live"))AutoMotionIntegrationTest=true; StartHidden=args.Contains("--background");
    bool created;
   using(var mutex=new Mutex(true,@"Local\USBHomeCamNAVERSingleInstance",out created)) {
-   if(!created){MessageBox.Show("USB HomeCam NAVER이 이미 실행 중입니다.");return;}
+   if(!created){if(StartHidden)return;try{using(var existing=EventWaitHandle.OpenExisting(@"Local\USBHomeCamNAVERRestore"))existing.Set();}catch(WaitHandleCannotBeOpenedException){MessageBox.Show("구 버전 녹화기가 실행 중입니다. 기존 창을 확인해 주세요.");}return;}
   Application.EnableVisualStyles();
   Application.SetCompatibleTextRenderingDefault(false);
-  Application.Run(new CamForm());
+  using(var signal=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\USBHomeCamNAVERRestore"))Application.Run(new CamForm(signal));
  }
 }
 
  static bool SelfTest() {
   string folder=Path.Combine(Path.GetTempPath(),"USBHomeCam-selftest-"+Guid.NewGuid().ToString("N"));
   Directory.CreateDirectory(folder);
-  string report=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"USBHomeCamNAVER","logs","selftest-last.txt");
+  string report=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"test-results","selftest-last.txt");
   var lines=new List<string>();
   try{
     string ff=Path.Combine(folder,"ffmpeg.exe");
@@ -99,19 +100,19 @@ internal sealed partial class CamForm : Form {
  const int stableSeconds=7;
  const int minDiskGb=15;
 
- public CamForm() {
+ public CamForm(EventWaitHandle restoreSignal) {
   bin=Path.Combine(data,"bin"); config=Path.Combine(data,"auth","naver-pat.dat");
   logs=Path.Combine(data,"logs"); settings=Path.Combine(data,"settings.txt");
   ffmpeg=Path.Combine(bin,"ffmpeg.exe");
   recordRoot=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),"USBHomeCam");
   Directory.CreateDirectory(data); Directory.CreateDirectory(bin);Directory.CreateDirectory(logs);Directory.CreateDirectory(Path.GetDirectoryName(config));
   ReadSettings();InitRemoteControl();LoadRecordingMode();
-  Text="USB HomeCam NAVER | USB 카메라 실시간 녹화 + 네이버 MYBOX 백업";
-  Font=new Font("Malgun Gothic",9F); Size=new Size(860,715);MinimumSize=new Size(720,610);
+  Text="CHome PC 통합 관리 | 카메라 · 원격 제어 · 실시간 영상 · MYBOX";
+  Font=new Font("Malgun Gothic",9F); Size=new Size(940,790);MinimumSize=new Size(780,650); if(Entry.StartHidden)Opacity=0;
   StartPosition=FormStartPosition.CenterScreen;
   BackColor=Color.FromArgb(247,249,253);
-  BuildUI();
-  Shown+=delegate {
+  BuildUI(); InitSupervisor(restoreSignal);
+  Shown+=delegate {if(Entry.StartHidden){HideToTray();Opacity=1;}
     BeginInit();
   };
   FormClosing+=OnFormClosing;
@@ -120,15 +121,15 @@ internal sealed partial class CamForm : Form {
   tick.Start();
  }
  void BuildUI(){
-  var panel=new TableLayoutPanel { Dock=DockStyle.Fill,Padding=new Padding(14),ColumnCount=1,RowCount=6,AutoScroll=true };
-  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,55));
-  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,92));
-  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,136));
-  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,58));
+  var panel=new TableLayoutPanel { Dock=DockStyle.Fill,Padding=new Padding(14),ColumnCount=1,RowCount=7,AutoScroll=true };
   panel.RowStyles.Add(new RowStyle(SizeType.Absolute,45));
-  panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,92));
+  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,124));
+  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,94));
+  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,45));
+  panel.RowStyles.Add(new RowStyle(SizeType.Absolute,140)); panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
   Controls.Add(panel);
-  var header=new Label {Dock=DockStyle.Fill,Text="USB HomeCam NAVER     |     PC 켜진 동안 연속 녹화 → 네이버 MYBOX 자동 백업",Font=new Font("Malgun Gothic",12F,FontStyle.Bold),ForeColor=Color.FromArgb(25,48,83),TextAlign=ContentAlignment.MiddleLeft};
+  var header=new Label {Dock=DockStyle.Fill,Text="CHome PC 통합 관리     |     녹화 · 원격 제어 · 실시간 영상 · MYBOX",Font=new Font("Malgun Gothic",12F,FontStyle.Bold),ForeColor=Color.FromArgb(25,48,83),TextAlign=ContentAlignment.MiddleLeft};
   panel.Controls.Add(header,0,0);
   var selection=new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=5,RowCount=2,Padding=new Padding(8),BackColor=Color.White };
   selection.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,104));
@@ -158,7 +159,7 @@ internal sealed partial class CamForm : Form {
   pathLabel=AddStatus(states,0,3,"녹화 저장 폴더",recordRoot);
   states.SetColumnSpan(pathLabel,2);panel.Controls.Add(states,0,2);
 
-  var tools=new FlowLayoutPanel {Dock=DockStyle.Fill,WrapContents=false,AutoScroll=true,Padding=new Padding(3,10,0,4)};
+  var tools=new FlowLayoutPanel {Dock=DockStyle.Fill,WrapContents=true,AutoScroll=false,Padding=new Padding(3,6,0,4)};
   loginButton=Btn("MYBOX 토큰 등록",delegate{ConnectGoogle();});loginButton.Width=165;tools.Controls.Add(loginButton);
   folderButton=Btn("저장 폴더 변경",delegate{ChooseFolder();});folderButton.Width=140;tools.Controls.Add(folderButton);
   viewButton=Btn("녹화 폴더 열기",delegate{OpenFolder();});viewButton.Width=140;tools.Controls.Add(viewButton);
@@ -166,7 +167,7 @@ internal sealed partial class CamForm : Form {
   panel.Controls.Add(tools,0,3);
 
   var settingsPanel=new FlowLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(4,5,0,2),WrapContents=false};
-  autoStart=new CheckBox {Text="Windows 로그인 시 자동 실행 및 녹화",Width=300,AutoSize=false};
+  autoStart=new CheckBox {Text="Windows 로그인 시 백그라운드 자동 실행",Width=300,AutoSize=false};
   autoStart.Checked=HasStartup();autoStart.CheckedChanged+=delegate{if(!settingStartup) SetStartup(autoStart.Checked);};
   settingsPanel.Controls.Add(autoStart);
   var note=new Label {Text="로컬 영상 자동 삭제 안 함 · 10초 TS 조각 · 클라우드 HTTP 업로드 완료 확인",Width=470,Height=27,TextAlign=ContentAlignment.MiddleLeft,ForeColor=Color.FromArgb(89,106,125)};
@@ -174,7 +175,7 @@ internal sealed partial class CamForm : Form {
   var logPanel=new Panel{Dock=DockStyle.Fill,BackColor=Color.White,Padding=new Padding(10)};
   var label=new Label{Text="상세 작업 로그 (인증 토큰·비밀번호는 표시하지 않음)",Dock=DockStyle.Top,Height=24,ForeColor=Color.FromArgb(30,54,81)};
   logBox=new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,ForeColor=Color.FromArgb(29,50,70),Font=new Font("Consolas",9F),WordWrap=false};
-  logPanel.Controls.Add(logBox);logPanel.Controls.Add(label);panel.Controls.Add(logPanel,0,5);
+  logPanel.Controls.Add(logBox);logPanel.Controls.Add(label);BuildSupervisorUI(panel); panel.Controls.Add(logPanel,0,6);
   RefreshLabels();
  }
  Button Btn(string name,Action action){
@@ -201,7 +202,7 @@ internal sealed partial class CamForm : Form {
   if(InvokeRequired){try{BeginInvoke(new Action(RefreshLabels));}catch{}return;}
   if(IsDisposed)return;
   cameraLabel.Text=string.IsNullOrEmpty(cameraName)?"USB 카메라 연결 필요":"USB 카메라: "+cameraName+(OldVersionRunning()?" (기존 Google 앱 먼저 종료)":"");
-  recordLabel.Text="녹화: "+(recording ? (capture!=null&&!capture.HasExited ? "● 진행 중":"카메라 재접속 대기"):"■ 정지");
+  recordLabel.Text="녹화: "+(!recording?"■ 정지":motionOnly&&!motionEventActive?(ProcessAlive(motionProbe)?"움직임 감시 중 · 영상 저장 대기":"감시 카메라 재접속 대기"):(ProcessAlive(capture)?"● 영상 저장 중":"카메라 재접속 대기"));
   recordLabel.ForeColor=recording?Color.FromArgb(7,120,71):Color.FromArgb(140,55,55);
   driveLabel.Text=loginBusy?"MYBOX: 토큰 확인 중":"MYBOX: "+cloudDescription;
   driveLabel.ForeColor=loggedIn?Color.FromArgb(7,120,71):Color.FromArgb(145,95,32);
@@ -291,12 +292,12 @@ internal sealed partial class CamForm : Form {
  bool HasStartup(){
   try{using(var k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")){
    var v=k==null?"":(k.GetValue("USBHomeCamNAVER") as string ?? "");
-   return v.Contains(Application.ExecutablePath);
+   return v.IndexOf(Application.ExecutablePath,StringComparison.OrdinalIgnoreCase)>=0 && v.Contains("--background");
   }}catch{return false;}
  }
  void SetStartup(bool yes){
   try{using(var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run",true)){
-    if(yes)key.SetValue("USBHomeCamNAVER",Q(Application.ExecutablePath));
+    if(yes)key.SetValue("USBHomeCamNAVER",Q(Application.ExecutablePath)+" --background");
     else key.DeleteValue("USBHomeCamNAVER",false);
     Log(yes?"Windows 로그인 시 자동 실행 설정됨.":"자동 실행 해제됨.");
    }}catch(Exception ex){settingStartup=true;autoStart.Checked=!yes;settingStartup=false;Error("자동 실행 설정 실패: "+ex.Message);}
@@ -308,7 +309,7 @@ internal sealed partial class CamForm : Form {
   try{
    var d=new DriveInfo(Path.GetPathRoot(recordRoot));if(d.AvailableFreeSpace<minDiskGb*1024L*1024*1024){Error("디스크 여유 공간이 15GB 미만이라 녹화를 시작할 수 없습니다.");return;}
   }catch(Exception ex){Error("저장 디스크 확인 실패: "+ex.Message);return;}
-  recording=true;autoRecordPending=false;PersistRemoteDesired("START");Log("연속 녹화 시작. 10초 TS 파일 분할, 클라우드 자동 백업.");
+  recording=true;autoRecordPending=false;PersistRemoteDesired("START");Log(motionOnly?"움직임 감시 시작. 감지되면 1초 조각으로 이벤트 녹화합니다.":"상시 녹화 시작. 1초 TS 파일 저장 및 MYBOX 자동 백업.");
   if(motionOnly)StartMotionProbe();else StartCapture();RefreshLabels();
    if(Entry.AutoMotionIntegrationTest){Entry.AutoMotionIntegrationTest=false;Task.Run(()=>{Thread.Sleep(32000);try{BeginInvoke((Action)delegate{if(recording)ForceMotionTest();});}catch{}});}
  }
@@ -316,8 +317,8 @@ internal sealed partial class CamForm : Form {
   if(!recording || motionOnly&&!motionEventActive || capture!=null&&!capture.HasExited)return;
   var day=DateTime.Now.ToString("yyyy-MM-dd");
   var dir=Path.Combine(recordRoot,motionOnly?"motion-chunks":"raw",day);Directory.CreateDirectory(dir);
-  string file=Path.Combine(dir,"%Y-%m-%d_%H-%M-%S.ts");
-  string arg=(motionOnly?"":"-nostdin ")+"-hide_banner -loglevel warning -f dshow -i "+Q("video="+cameraName)+
+  string file=Path.Combine(dir,"%Y-%m-%d_%H-%M-%S_"+Guid.NewGuid().ToString("N").Substring(0,8)+".ts");
+  string arg=(motionOnly?"":"-nostdin ")+"-y -hide_banner -loglevel warning -f dshow -i "+Q("video="+cameraName)+
    " -an -c:v libx264 -preset ultrafast -tune zerolatency -crf 28 -pix_fmt yuv420p "+
    "-force_key_frames "+Q("expr:gte(t,n_forced*1)")+
    " -f segment -segment_time "+(motionOnly?1:chunkSeconds)+" -reset_timestamps 1 -strftime 1 -segment_format mpegts "+Q(file)+
@@ -381,19 +382,19 @@ internal sealed partial class CamForm : Form {
   if(!recording && autoRecordPending && !string.IsNullOrEmpty(cameraName) && !OldVersionRunning())StartRecording();
   UpdatePendingCount();
   if(loggedIn && !uploadBusy && (DateTime.Now-lastUploadAttempt).TotalSeconds>=0.5)UploadPass();
-  RemoteTick();MotionRuntimeTick();RefreshLabels();
+  RemoteTick();MotionRuntimeTick();SupervisorTick();RefreshLabels();
  }
  static string HexHash(byte[] content,HashAlgorithm hash){
   using(hash){return BitConverter.ToString(hash.ComputeHash(content)).Replace("-","").ToLowerInvariant();}
  }
- void OnFormClosing(object sender,FormClosingEventArgs e){
+ void OnFormClosing(object sender,FormClosingEventArgs e){ if(e.CloseReason==CloseReason.UserClosing && !explicitQuit){e.Cancel=true;HideToTray();return;}
   if(recording){
    var answer=MessageBox.Show(this,"녹화 또는 감시 중입니다. 종료하면 중단됩니다. 기존 녹화 파일은 보존됩니다.\n종료할까요?","CHome 종료 확인",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
-   if(answer!=DialogResult.Yes){e.Cancel=true;return;}
+   if(answer!=DialogResult.Yes){e.Cancel=true;explicitQuit=false;return;}
   }
   StopMotionProbe();StopMotionRuntime();
   if(motionOnly&&motionEventActive){GracefulCloseMotionCapture();motionEventActive=false;}
-  exiting=true;recording=false;cancel.Cancel();
+  exiting=true;recording=false;cancel.Cancel();DisposeSupervisor();
   try{if(capture!=null&&!capture.HasExited)capture.Kill();}catch{}
  }
 }

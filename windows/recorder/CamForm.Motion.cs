@@ -40,9 +40,11 @@ internal sealed partial class CamForm {
   if(motionStatusLabel==null || motionStatusLabel.IsDisposed)return;
   string status;
   lock(motionGuard){
-   status=(motionOnly?motionEventActive:motionWindow.Active)?"움직임 감지됨 · 이벤트 녹화 중":"움직임 감시 중";
+   status=!recording?"감시·녹화 중지":(motionOnly?motionEventActive:motionWindow.Active)?"움직임 감지 · 이벤트 녹화 중":"움직임 감시 중";
+   status+=" · 감지 "+motionPositiveClips+"회";
+   if(motionWindow.LastMotion!=DateTime.MinValue)status+=" · 최근 "+motionWindow.LastMotion.ToString("HH:mm:ss");
   }
-  motionStatusLabel.Text=status+" | 높음 · 사전30초 · 사후120초 · 알림1초";
+  motionStatusLabel.Text=status;
  }
  void QueueMotionProbe(string path) {
   if(string.IsNullOrEmpty(path)||!path.EndsWith(".ts",StringComparison.OrdinalIgnoreCase))return;
@@ -160,6 +162,13 @@ internal sealed partial class CamForm {
  }
  void ForceMotionTest(){
   if(!recording){MessageBox.Show("녹화가 실행 중일 때 시험할 수 있습니다.");return;}
+  if(motionOnly){
+   if(!motionEventActive)StartMotionEventSession();
+   else {motionEndsAt=DateTime.Now.AddSeconds(120);bool testFresh,testAlert;motionWindow.Trigger(DateTime.Now,out testFresh,out testAlert);}
+   motionTestMode=true;
+   Log("사용자 시험 감지: 실제 움직임 감지와 구분하며, 120초 이벤트 영상 저장·업로드를 시험합니다.");
+   NotifyMotion(true);UpdateMotionStatus();return;
+  }
   bool opening,alert;
   lock(motionGuard){
    DateTime now=DateTime.Now;

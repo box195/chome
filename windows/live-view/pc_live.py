@@ -27,6 +27,17 @@ SECRETS_HELPER = BASE / "push-sender" / "ReadPushSecrets.exe"
 VIDEO_FOLDER = pathlib.Path(os.environ.get("CHOME_VIDEO_ROOT",str(pathlib.Path.home() / "Videos" / "USBHomeCam")))
 
 
+HEARTBEAT_PATH = pathlib.Path(os.environ["LOCALAPPDATA"]) / "USBHomeCamNAVER" / "remote" / "pc-live-heartbeat.json"
+
+def write_heartbeat(ok, error=""):
+    try:
+        HEARTBEAT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        path = HEARTBEAT_PATH.with_suffix(".json.tmp")
+        path.write_text(json.dumps({"updatedAt": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+                                   "ok": bool(ok), "error": error if error.isidentifier() else "signal_unavailable"}), encoding="utf-8")
+        os.replace(path, HEARTBEAT_PATH)
+    except OSError:
+        pass
 class OwnerAuth:
     def __init__(self):
         raw = subprocess.check_output([str(SECRETS_HELPER)], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -247,7 +258,7 @@ async def main():
     try:
         while True:
             try:
-                offer=await asyncio.to_thread(owner.request,"offer")
+                offer=await asyncio.to_thread(owner.request,"offer"); write_heartbeat(True)
                 sid=(offer or {}).get("id") if isinstance(offer,dict) else None
                 if sid and sid!=last:
                     last=sid
@@ -274,7 +285,7 @@ async def main():
                         await asyncio.gather(pump,return_exceptions=True)
                         pump=None
             except Exception as error:
-                print("CHOME_PC_LIVE_SIGNAL_ERROR",type(error).__name__)
+                print("CHOME_PC_LIVE_SIGNAL_ERROR",type(error).__name__); write_heartbeat(False,"signal_"+type(error).__name__)
             await asyncio.sleep(1.0)
     finally:
         if pump:

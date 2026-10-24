@@ -1,5 +1,17 @@
 # CHome
 
+## Windows 통합 관리 화면 (2026-10-24)
+
+바탕화면의 `USBHomeCam-NAVER-Controlled.exe` 하나에서 녹화·움직임 감시·MYBOX·원격 제어·Firebase·PC 실시간 송신·휴대폰 알림 발송 상태를 확인합니다. 릴레이/실시간 시작·재시작과 모바일 웹 열기를 지원합니다.
+
+창의 X는 트레이로 숨깁니다. 바탕화면 아이콘을 다시 실행하거나 트레이를 더블클릭하면 기존 창을 복원합니다. `Windows 로그인 시 백그라운드 자동 실행`을 켜면 현재 실행파일을 `--background`로 등록합니다. 이미 실행 중인 프로그램을 `--background`로 다시 실행하면 창을 띄우지 않습니다. 트레이의 ‘완전히 종료’는 녹화기만 종료하며, 독립 원격 수신기·영상 송신기·알림 발송기는 유지됩니다.
+
+GUI는 검증한 경로의 수신기·영상 송신기가 없으면 숨김 실행하고, 실제 전송 후 생성되는 `firebase-heartbeat.json`, `pc-live-heartbeat.json`, `push-heartbeat.json`으로 연결 상태를 표시합니다. 오래된 신호는 정상으로 표시하지 않습니다. 수신기는 기존 `Documents/Codex/2026-09-28/new-chat/outputs/usb-cam-naver-gui/remote-control-v1` 설치를 재사용하며, OneDrive 문서 경로와 사용자 프로필의 로컬 Documents 경로를 구분합니다. 설치 폴더를 옮기면 경로 탐색도 조정해야 합니다.
+
+실시간 미리보기 JPG가 이미 있어도 녹화를 다시 시작할 수 있도록 덮어쓰기를 명시하고, 녹화 영상 파일명에는 매 실행마다 다른 식별자를 붙여 기존 영상을 덮어쓰지 않습니다. 움직임 감지 모드의 ‘감지 알림 시험’은 실제 120초 이벤트 저장 경로를 실행하는 사용자 시험이며 물리적인 움직임 감지와 구분합니다.
+
+검증: 네이티브 화면·단일 실행·숨김 실행, 웹 시작/중지/다시 시작의 실제 ACK, 실제 1초 TS 생성과 MYBOX 업로드 확인. Windows 재부팅 시험 및 Android 알림 재수신 시험은 이번 GUI 작업에서 수행하지 않았습니다.
+
 모바일 웹앱: https://box195.github.io/chome/
 
 GitHub Pages → Firebase Realtime Database → Windows USB 카메라의 녹화를 제어합니다. 영상은 PC와 네이버 MYBOX에 저장됩니다. 휴대폰에는 Tailscale 설치가 필요 없습니다.
